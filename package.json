@@ -1,0 +1,21 @@
+{
+  "name": "dsh-rehearsal",
+  "version": "0.1.0",
+  "description": "Upgrade rehearsal CLI for DeepSeek Harness (dsh): static peer-graph pre-flight plus keyless real-session migration and write-round drills against a candidate dsh version, in a throwaway DSH_HOME. Keyless by design; reports carry no message bodies and no user paths.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.19" },
+  "bin": { "dsh-rehearsal": "src/cli.js" },
+  "files": ["src", "README.md", "README.zh.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test",
+    "smoke:check": "node src/cli.js check"
+  },
+  "repository": { "type": "git", "url": "git+https://github.com/wuwaka/dsh-rehearsal.git" },
+  "bugs": { "url": "https://github.com/wuwaka/dsh-rehearsal/issues" },
+  "homepage": "https://github.com/wuwaka/dsh-rehearsal#readme",
+  "dependencies": {
+    "semver": "^7.7.3"
+  },
+  "keywords": ["dsh", "dsh-plugin", "deepseek-harness", "upgrade", "rehearsal", "migration", "compatibility", "session", "keyless"]
+}

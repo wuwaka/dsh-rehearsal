@@ -1,0 +1,67 @@
+name: CI
+
+# Only `check` and the unit tests run here. `run` is deliberately NOT exercised
+# in CI: it npm-installs a ~500-package candidate dsh, boots it, and replays
+# copies of real session logs — none of which is deterministic or safe on a
+# shared runner. Its safety model is covered offline instead: the sandbox cwd
+# rewrite, the read-only allowlist and the suppression patch all have unit tests.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        # engines is >=22.19; 22 and 24 are the two lines users actually have
+        # (DSH Desktop 2.0.17 hosts run Node 24). zstd in node:zlib landed in
+        # v22.15.0 and is Stability:1, so pin the floor explicitly.
+        node: ['22.19', '24.x']
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Assert the zlib zstd API this tool depends on exists
+        shell: bash
+        run: |
+          node -e "
+            const z = require('node:zlib');
+            for (const k of ['zstdDecompressSync', 'zstdCompressSync', 'createZstdDecompress']) {
+              if (typeof z[k] !== 'function') throw new Error('missing zlib API: ' + k);
+            }
+          "
+
+      - run: npm ci
+
+      - run: npm test
+
+      # The CLI test builds its fixture home inside os.homedir() so the
+      # scrubbing assertions are real on every platform; make sure it never
+      # leaves copies of session data behind on a shared runner.
+      - name: Assert no leftover fixture homes in the user directory
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const os = require('node:os');
+            const left = fs.readdirSync(os.homedir()).filter((n) => n.startsWith('dsh-rehearsal-fixture-'));
+            if (left.length) throw new Error('fixture homes leaked into HOME: ' + left.join(','));
+          "
