@@ -240,6 +240,6 @@ CI 执行 `npm ci` 与 `npm test`，矩阵为 windows / macOS / linux × Node 22
 
 发布由 tag 触发（`.github/workflows/release.yml`），两种情况会直接终止：tag 与 `package.json` 版本不一致；两份 CHANGELOG 中任一缺少对应小节。通过后 tarball 与其 `.sha256` 附至 Release，正文按固定顺序生成（中文小节 → 安装 → `---` → 英文小节）。npm 发布由 `publish.yml` 承担，缺少 `NPM_TOKEN` 时跳过而非报错。
 
-发布流程与历史处理见 [PUBLISHING.md](PUBLISHING.md)。版本策略与被修订的主张见 [CHANGELOG.zh.md](CHANGELOG.zh.md)（英文版 [CHANGELOG.md](CHANGELOG.md)）；`run --to <版本>` 中的版本号为被测 `dsh` 的版本，与本工具版本无关。由代码与测试保证的承诺、以及两个由使用方承担责任的旗标，见 [SECURITY.md](SECURITY.md)。
+发布流程与历史处理见 [PUBLISHING.md](PUBLISHING.md)（英文版 [PUBLISHING.en.md](PUBLISHING.en.md)）。版本策略与被修订的主张见 [CHANGELOG.zh.md](CHANGELOG.zh.md)（英文版 [CHANGELOG.md](CHANGELOG.md)）；`run --to <版本>` 中的版本号为被测 `dsh` 的版本，与本工具版本无关。由代码与测试保证的承诺、以及两个由使用方承担风险的旗标，见 [SECURITY.md](SECURITY.md)（英文版 [SECURITY.en.md](SECURITY.en.md)）。仓库内每份文档都以这样的双语对形式存在；两份内容走偏时 `test/docs.test.js` 会失败。
 
 MIT License。与 DeepSeek 无关联、未获其背书。`dsh` / DeepSeek Harness 上游位于 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)；桌面宿主与活跃缺陷跟踪位于 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。

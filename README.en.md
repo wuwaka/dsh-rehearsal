@@ -199,7 +199,7 @@ That the read side cannot decide this class of corruption is documented in `dsh-
 
 Facing the same corruption class, `gating-hub` rewrites producer source (contract rule `session-message-source-kind`, converting plugins that still emit the V3 `{kind:'plugin'}` wrapper to a producer-owned kind). A static scan cannot decide it without large-scale false positives, and a contract diff changes code rather than data; upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) describes a session that opens normally and fails on every write round. Only an actual write decides, and writing used to require an API key.
 
-Each log pattern, where it is detected, what a hit and a non-hit respectively prove, and which cannot be reproduced here: [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md).
+Each log pattern, where it is detected, what a hit and a non-hit respectively prove, and which cannot be reproduced here: [`docs/FAILURE_MODES.en.md`](docs/FAILURE_MODES.en.md) (Chinese: [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md)).
 
 ## Known limits
 
@@ -243,6 +243,6 @@ CI runs `npm ci` and `npm test` across windows / macOS / linux × Node 22.19 and
 
 Releases are tag-triggered (`.github/workflows/release.yml`) and stop in two cases: the tag does not match `package.json`'s version, or either changelog lacks the corresponding section. The tarball and its `.sha256` are then attached to the Release, and the body is generated in a fixed order (Chinese section → install → `---` → English section). npm publishing runs through `publish.yml`, which skips rather than failing when `NPM_TOKEN` is absent.
 
-Release procedure and history handling: [PUBLISHING.md](PUBLISHING.md). Versioning policy and retracted claims: [CHANGELOG.md](CHANGELOG.md) (Chinese: [CHANGELOG.zh.md](CHANGELOG.zh.md)); the version in `run --to <version>` belongs to the `dsh` under test, not to this tool. Promises enforced by code and tests, and the two flags whose risk lies with the operator: [SECURITY.md](SECURITY.md).
+Release procedure and history handling: [PUBLISHING.en.md](PUBLISHING.en.md) (Chinese: [PUBLISHING.md](PUBLISHING.md)). Versioning policy and retracted claims: [CHANGELOG.md](CHANGELOG.md) (Chinese: [CHANGELOG.zh.md](CHANGELOG.zh.md)); the version in `run --to <version>` belongs to the `dsh` under test, not to this tool. Promises enforced by code and tests, and the two flags whose risk lies with the operator: [SECURITY.en.md](SECURITY.en.md) (Chinese: [SECURITY.md](SECURITY.md)). Every document in this repository ships as such a pair, and `test/docs.test.js` fails when a pair drifts apart.
 
 MIT License. Not affiliated with or endorsed by DeepSeek. `dsh` / DeepSeek Harness is upstream at [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness); the Desktop host and active issue tracker are at [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).

@@ -3,6 +3,9 @@ contact_links:
   - name: Security report (including anything that leaked into a report)
     url: https://github.com/wuwaka/dsh-rehearsal/security/advisories/new
     about: Private advisory. Do not open a public issue containing report output.
-  - name: What this tool promises, in code
+  - name: What this tool promises, in code (English)
+    url: https://github.com/wuwaka/dsh-rehearsal/blob/main/SECURITY.en.md
+    about: Guarantees enforced and tested, plus the two flags whose risk lies with the operator.
+  - name: 本工具由代码保证的承诺（中文）
     url: https://github.com/wuwaka/dsh-rehearsal/blob/main/SECURITY.md
-    about: The guarantees that are enforced and tested, and the two red lines that are yours.
+    about: 由测试覆盖的承诺，以及两个由使用方承担风险的旗标。

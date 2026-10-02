@@ -1,5 +1,7 @@
 # Changelog · 中文
 
+[简体中文](CHANGELOG.zh.md) | [English](CHANGELOG.md)
+
 格式：[Keep a Changelog](https://keepachangelog.com/zh-Hans/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。英文版为
 [CHANGELOG.md](CHANGELOG.md)，两份文件的小节必须一一对应：`test/changelog.test.js` 断言该一致性，

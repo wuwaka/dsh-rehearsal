@@ -1,5 +1,7 @@
 # 失效签名 · failure signatures
 
+[简体中文](FAILURE_MODES.md) | [English](FAILURE_MODES.en.md)
+
 本文件列出 `run` 各阶段识别的日志形态，每条标注检测位置与出处：有上游 issue 编号的锚到编号，否则标注本仓库的 `file:line`。
 
 作用范围：一个输出升级结论的工具，最主要的风险不是崩溃，而是把未经演练的事情表述成已经验证。因此每条签名均说明三项内容——命中时说明什么、未命中不能推出什么、本机能否复现。
@@ -55,12 +57,5 @@
 2. 在 `test/signatures.test.js` 加一对断言：真实日志行必须命中，健康日志行必须不命中。断言中的日志须取自 issue 正文或真实产物原文，不得为通过正则而编造。
 3. 在本文件对应表中新增一行，如实标注本机是否可复现。不可复现须写明原因，否则读者会误认为已验证。
 
----
+完整英文版见 [FAILURE_MODES.en.md](FAILURE_MODES.en.md)。两份的 `## ` 小节数与全部 `file:line` 引用由 `test/docs.test.js` 断言一致。
 
-### English summary
-
-- Every log pattern `run` recognizes is listed with its detection site (`file:line`) and its origin: an upstream issue number where one exists, otherwise a locally defined criterion. No project in this ecosystem appears to key failure signatures to upstream issue numbers.
-- `v4-producer-source-kind` (#1229) and `patch-entry-not-found` (#1294) are both unreproducible on the development machine. The detection is retained, and the table states that explicitly rather than implying coverage.
-- `MISSING_CREDENTIAL` means passing during boot and not-exercised during a write round. The same string carrying opposite meanings is why verdicts derive from artifacts and never from exit codes.
-- Sessions carrying a preset cannot produce a decisive write round, so `writeRoundVerdict()` aggregates over non-preset rounds only.
-- Adding a signature requires a matched pair of assertions: the real log line must hit, a healthy line must not.

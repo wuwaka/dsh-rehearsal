@@ -1,58 +1,48 @@
-# Security policy
+[简体中文](SECURITY.md) | [English](SECURITY.en.md)
 
-This tool is not a security boundary. Two flags perform real actions on the host
-when explicitly enabled; they are listed under [Operator-owned risk](#operator-owned-risk).
-Reports that describe one of those behaviours as a vulnerability belong in a normal
-issue instead.
+# 安全策略
 
-## Guarantees enforced in code
+本工具不是安全边界。有两个旗标在显式开启后会对主机执行真实动作，见[由使用方承担的风险](#由使用方承担的风险)。把这类既定行为当作漏洞的报告，应提交为普通 issue。
 
-Each row below is implemented and covered by a test, so a report that one of them
-is broken is a vulnerability report:
+## 由代码保证的承诺
 
-| Guarantee | Where |
+下表中每一行都在代码中实现并有测试覆盖，因此以下任何一条失效都属于真实的漏洞报告：
+
+| 承诺 | 位置 |
 |---|---|
-| The rehearsal never installs into your live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
-| Copies of your sessions get their recorded `cwd` rewritten into the shadow, **and** are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches a child process; only the stripped **names** are recorded (`redactedEnvNames`) | `src/lib/util.js:56-75` |
-| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:75` |
-| Reports contain no message bodies and no user paths: `stderr` is filtered to diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:136` — and a test greps the finished report for home paths and reasoning markers |
-| Tool providers are suppressed by row id **and** package-name prefix by default; a session is only drilled when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
-| The shadow home — which holds plaintext session copies — is deleted on every exit path, and the outcome is recorded as `shadowCleanup` | `src/commands/run.js` |
+| 预演不向活动 profile 安装任何内容；候选版本装入私有 npm 前缀，`DSH_HOME` 指向别处 | `src/lib/shadow.js` `installCandidate` |
+| 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
+| 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名（`redactedEnvNames`） | `src/lib/util.js:56-75` |
+| 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:75` |
+| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 会清理每个阶段、coverage 块、target 与 warnings | `src/lib/report.js:136`；另有测试对最终报告 grep 家目录与推理标记 |
+| 默认同时按行 id 与包名前缀抑制工具提供方；仅当会话历史中出现的全部工具都在只读允许清单内时才演练（fail-closed） | `src/lib/shadow.js`、`src/lib/drill.js` |
+| 影子 home 内含明文会话副本，所有退出路径都会删除，结果记录为 `shadowCleanup` | `src/commands/run.js` |
 
-## Operator-owned risk
+## 由使用方承担的风险
 
-1. `--allow-tools` executes the tool calls recorded in session history. The
-   sandboxed `cwd` still applies, but `pwsh`, `bash` or any absolute path can
-   leave that directory. The flag exists because suppressing every tool would make
-   the write round vacuous; it is opt-in and prints a banner before running.
-2. `--keep` leaves plaintext copies of sessions in the shadow home and the install
-   prefix for debugging. It should not be used on an unmanaged machine, and the
-   output should be removed afterwards (`dsh-rehearsal clean --yes`).
+1. `--allow-tools` 会执行会话历史中记录的工具调用。沙箱 `cwd` 仍然生效，但 `pwsh`、`bash`
+   或任意绝对路径都可以越出该目录。保留该旗标是因为全部抑制工具会让写回合失去意义；
+   它需要显式开启，执行前会打印横幅。
+2. `--keep` 会把会话的明文副本留在影子 home 与安装前缀中，用于调试。不应在不受控制的
+   机器上使用，事后需清理（`dsh-rehearsal clean --yes`）。
 
-Related, but a scope limit rather than a risk: candidate installs default to
-`--ignore-scripts`, matching the short build-script list the official pnpm setup
-whitelists. `--run-scripts` executes third-party lifecycle scripts.
+相关但属范围限制而非风险：候选版本安装默认 `--ignore-scripts`，与官方 pnpm 配置中很短的
+构建脚本白名单一致。`--run-scripts` 会执行第三方生命周期脚本。
 
-## Out of scope
+## 范围之外
 
-- Not a sandbox against a hostile candidate `dsh`. A rehearsal runs a build of the
-  harness under evaluation; file-level precautions do not apply to a malicious build.
-- Not a defence against installed plugins. A rehearsal loads the pinned plugin set,
-  so a plugin that exfiltrates data does so during the rehearsal as well.
-- Attachment side data (`~/.dsh/attachments`, `cache/attachments`) is neither copied
-  nor verified; attachment-reference integrity is declared out of scope rather than
-  assumed covered.
-- Scrubbing is a filter, not a proof. Real message content or a real user path
-  appearing in a report is a defect worth reporting, and report files should be
-  treated as sensitive regardless.
+- 不防御恶意的候选 `dsh`。预演运行的是待评估 harness 的一个构建；一旦该构建本身有害，
+  文件层面的约束并不适用。
+- 不防御已安装的插件。预演会加载钉定的插件集合，会外传数据的插件在预演中同样会外传。
+- 附件旁路数据（`~/.dsh/attachments`、`cache/attachments`）不复制也不校验；附件引用完整性
+  明确声明为范围之外，而非默认已覆盖。
+- 脱敏是过滤器，不是证明。报告中出现真实消息正文或真实用户路径属于缺陷，值得上报；
+  无论如何都应把报告文件视为敏感内容。
 
-## Reporting
+## 上报方式
 
-Use a [private security advisory](https://github.com/wuwaka/dsh-rehearsal/security/advisories/new).
-Include the candidate `dsh` version, OS, Node version, and the tool version
-(`dsh-rehearsal --version`).
+使用[私有安全通告](https://github.com/wuwaka/dsh-rehearsal/security/advisories/new)。
+附上候选 `dsh` 版本、操作系统、Node 版本与工具版本（`dsh-rehearsal --version`）。
 
-Report files and `run` output should not be pasted into a public issue: scrubbing is
-best-effort, and those files derive from local session history. `report.json` and
-`report.md` stay on disk; this tool uploads nothing.
+不要将报告文件或 `run` 输出粘贴到公开 issue：脱敏属尽力而为，而这些文件派生自本地会话历史。
+`report.json` 与 `report.md` 只留在磁盘上，本工具不上传任何内容。

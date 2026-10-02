@@ -1,152 +1,151 @@
-# Publishing checklist
+[简体中文](PUBLISHING.md) | [English](PUBLISHING.en.md)
 
-Read this **before the first `git push`.**
+# 发布检查清单
 
-## The history contains a pre-scrub snapshot
+首次 `git push` 之前读一遍，每次发版前再读一遍。
 
-The working tree and `HEAD` are clean — `git grep` over the whole tree returns **0** hits for user
-paths, and the reports/tests enforce that (see the scrubbing tests).
+## 历史中含脱敏前的快照
 
-But commits are immutable, and the local history includes a snapshot taken **before** the scrub:
-that commit has **13 real path occurrences across 5 files** (`README.md`, `AUDIT.md`,
-`src/lib/sessions.js`, `test/report.test.js`, `test/sessions.test.js`), and two earlier commits
-carry 2 occurrences each (a synthetic fixture username in `test/report.test.js`).
+工作树与 `HEAD` 是干净的：全树 `git grep` 对用户路径返回 0 命中，脱敏测试负责维持这一点。
 
-`git push` publishes history, not just the tip. So publish a **single clean initial commit** instead
-of rewriting the audit trail:
+提交不可变，本地历史里仍有一个脱敏**之前**的快照：该提交在 5 个文件（`README.md`、
+`AUDIT.md`、`src/lib/sessions.js`、`test/report.test.js`、`test/sessions.test.js`）中留有
+13 处真实路径；更早的两个提交各含 2 处（`test/report.test.js` 里的合成夹具用户名）。
+
+`git push` 推的是历史而不只是末端。因此用一个独立的干净分支发布，不要改写审计轨迹：
 
 ```sh
 git checkout --orphan publish-clean
 git add -A
-git commit -m "dsh-rehearsal 0.1.0: static upgrade pre-flight + keyless session rehearsal"
+git commit -m "dsh-rehearsal: static upgrade pre-flight + keyless session rehearsal"
 
-# verify, then push the clean commit as the public default branch
-git diff --stat main publish-clean          # must print nothing (identical tree)
-git ls-tree -r --name-only publish-clean    # no .dsh-rehearsal/, no node_modules/, no fixtures
-git grep -nE "<TOKENS>" publish-clean --    # your own username / drive layout; expect no output
-npm test                                    # 57/57
+# 校验后，把这个干净的树推成公开默认分支
+git diff --stat main publish-clean          # 必须无输出（两棵树一致）
+git ls-tree -r --name-only publish-clean    # 不含 .dsh-rehearsal/、node_modules/、夹具
+git grep -nE "<TOKENS>" publish-clean --    # 用阅读者自己的用户名/盘符关键词；预期无输出
+npm test                                    # 必须全绿
 git remote add origin https://github.com/<you>/dsh-rehearsal.git
 git push origin publish-clean:main
 ```
 
-`main` keeps its full history locally on purpose: it is the audit trail (four rounds of review,
-recorded in `AUDIT.md` and `FIXES.md`). If you would rather not keep it, delete the branch after the
-push — but the public repo will already be independent of it.
+`main` 有意保留完整历史：它是审计轨迹，记录在 `AUDIT.md` 与 `FIXES.md`，且没有 upstream，
+因此不会被误推。
 
-## Artifacts are never committed
+### 同步 publish-clean
 
-`.gitignore` excludes `.dsh-rehearsal/`, which is where reports and rehearsal output land. Reports
-are scrubbed, but they do contain **session ids and histogram shapes from your machine**; keep them
-out of the repo.
-
-## After the repo is public
-
-1. **Publish to npm from CI.** `.github/workflows/publish.yml` runs on `release: published`, re-tests,
-   installs the packed tarball into a throwaway prefix and smoke-runs it, then `npm publish --provenance`.
-   It **skips itself** when `NPM_TOKEN` is absent, so a repo without the secret shows no red pipeline:
-
-   ```sh
-   gh secret set NPM_TOKEN --repo <you>/dsh-rehearsal --body "<granular access token, Publish scope>"
-   ```
-
-   Publishing from a laptop is possible but note the trap on this machine: the default
-   `registry` in `~/.npmrc` is `registry.npmmirror.com`, a read-only mirror that answers 404 for
-   `npm whoami` and cannot accept a publish. Either use CI, or pass both overrides explicitly:
-
-   ```sh
-   npm publish --registry https://registry.npmjs.org // needs an auth token for that registry
-   ```
-
-   The name `dsh-rehearsal` was still unclaimed on 2026-10-02; the community has a habit of
-   reserving names without publishing, so claim it when you are actually ready.
-2. **Set topics.** `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`
-   (topics need the `repo` scope). Add `dsh-plugin` only as a **search affordance** —
-   this repository is deliberately not a `dsh plugin add` bundle, and the README's
-   header line says so. Do not let a topic become an install claim.
-
-3. **Do not submit to `awesome-dsh-plugin/awesome-dsh-plugin`.** Verified 2026-10-02:
-   its `scripts/check-submission.mjs:258-264` requires some `package.json` in the repo to
-   declare `dsh.bundle`, and a repo declaring only `dsh.client` is refused with
-   "that alone is not installable". `dsh-plugin-reducer` and `dsh-canary` — both external
-   CLIs, like this — return 0 hits in its generated list (4,412 entries). Submission would
-   burn a CI-gated PR and be rejected on a rule that is correct: being listed there implies
-   installability this tool intentionally does not have.
-
-   Descriptor keys there are whitelisted (`scripts/lib/entries.mjs:136`:
-   `url, name, category, description, tarball, file`; unknown keys fail CI), and an optional
-   `tarball` must be an https GitHub-release-hosted URL ending in `.tgz` — which is why
-   `release.yml` attaches exactly that.
-
-   Where listing *is* appropriate:
-   - `walkinglabs/awesome-deepseek-harness-plugins` → `docs/INCLUSION_POLICY.md` rule 4:
-     "It is a client, launcher, or development resource … placed outside the plugin
-     categories and labelled accordingly."
-   - `awesome-deepseekharness/awesome-deepseek-harness` → `CONTRIBUTING.md`, category
-     `🧩 Tools, Workflows & Presets`; it wants `README.md` (English) **and** `README.zh.md`
-     entries at the same position, and its example PR title is
-     `Add owner/repo to Category`.
-
-   Neither has been submitted as of 2026-10-02.
-
-4. **Add registry badges only after listing exists** (npm version/downloads, dshfind,
-   marketplace). Pre-added badges resolve to 404. The `dsh-doctor` gate badge does not apply:
-   its R/K/D gates score `dsh.bundle` packages, which this repository does not declare.
-
-5. Re-check the CI badge in the README header resolves once the first workflow run is green:
-   `gh run list --repo <you>/dsh-rehearsal`.
-
-## Cutting a release
-
-`release.yml` runs on a `v*` tag push and **refuses** in two cases, so the order matters:
+`git checkout main -- .` **不会删除** `main` 上已删除的文件；曾经有一个被废弃的脚本因此
+进入公开树。拷贝之后需显式删除 `main` 已不再包含的文件，并把"两棵树一致"作为推送前的闸门：
 
 ```sh
-npm test                                     # must be green, 61/61
-# 1. BOTH changelogs — CHANGELOG.zh.md and CHANGELOG.md: move Unreleased content under a
-#    new "## [X.Y.Z] - YYYY-MM-DD" heading in each (same versions, same order;
-#    test/changelog.test.js asserts the pair), add the [X.Y.Z] link at the bottom, and
-#    update the [Unreleased] compare range.
-# 2. package.json: "version" must equal X.Y.Z exactly, in the same commit.
-node scripts/release-notes.mjs vX.Y.Z        # prints exactly what the Release body will be
-git add -A && git commit -m "…"
-git tag -a "vX.Y.Z" -m "vX.Y.Z"
-git push origin publish-clean:main           # CI green first
-git push origin "vX.Y.Z"                     # triggers the Release job
+git checkout -q publish-clean && git checkout main -- . && git add -A
+git diff --stat main publish-clean          # 必须无输出
+[ -z "$(git diff main publish-clean)" ] && echo "GATE OK" || echo "GATE FAIL: 不要推送"
 ```
 
-The Release body is generated from the tagged commit in **both languages**, with the two
-install lines prepended — house style here is 中文（新增/修复/变更）→ 安装 → `---` → English
-twin. A missing section in either changelog fails the job, so notes cannot be written
-afterwards from memory.
+## 产物永不入库
 
-To rebuild notes or assets for a tag that is already out there, use **Run workflow →
-`release.yml` → tag** rather than moving the public tag: the job checks the tag out, so
-`package.json` and the changelogs still come from the tagged commit even when this file
-on `main` is newer.
+`.gitignore` 排除了 `.dsh-rehearsal/`，报告和预演输出都落在那里。报告已脱敏，但其中含有
+本机的会话 id 与直方图形状，不应入库。`*.tgz` 与 `SHA256SUMS.txt` 同样被忽略：入库的校验
+和会与 tag 实际指向的 tarball 失去对应关系。
 
-Then verify the release actually carries what it claims:
+## 切一个 release
+
+`release.yml` 由 `v*` tag 推送触发，有两种情况会直接终止，因此顺序很重要：
+
+```sh
+npm test                                     # 必须全绿
+# 1. 两份 CHANGELOG 都要改：CHANGELOG.md（英文）与 CHANGELOG.zh.md（中文）。
+#    把 Unreleased 内容移入新的 "## [X.Y.Z] - YYYY-MM-DD" 小节（版本号与顺序保持一致，
+#    test/changelog.test.js 断言成对），在文件底部加 [X.Y.Z] 链接，并更新 [Unreleased] 的 compare 区间。
+# 2. package.json 的 "version" 必须精确等于 X.Y.Z，且在同一个提交里。
+node scripts/release-notes.mjs vX.Y.Z        # 输出的就是 Release 正文
+git add -A && git commit -m "…"
+git tag -a "vX.Y.Z" -m "vX.Y.Z"
+git push origin publish-clean:main           # 先让 CI 变绿
+git push origin "vX.Y.Z"                     # 触发 Release job —— 这是对外可见动作
+```
+
+Release 正文由 tag 所在提交生成，中英双语并按固定顺序排列：中文（新增/修复/变更）→ 安装 →
+`---` → 英文对应小节。任一份 changelog 缺少对应小节都会让任务失败，因此正文不可能事后凭记忆补写。
+
+要重建一个已发布 tag 的正文或附件，使用 **Run workflow → `release.yml` → tag**，不要移动公开
+tag：该 job 会检出 tag 本身，因此即便 `main` 上这份文件更新，`package.json` 与 changelog 仍取自
+被 tag 的提交。
+
+随后验证 release 确实带有它声称的东西：
 
 ```sh
 gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
   --json tagName,isDraft,isPrerelease,assets --jq '{tagName,isDraft,isPrerelease,assets:[.assets[].name]}'
-# expect: draft=false, isPrerelease=false (unless the tag carries a `-`),
-#         assets = dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
+# 预期：draft=false、isPrerelease=false（tag 含 `-` 时为 true），
+#       assets = dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
 ```
 
-A tag containing `-` (e.g. `v0.3.0-rc.1`) is marked `--prerelease` automatically, and
-`publish.yml` will still attempt the npm publish — pass `--tag next` if a prerelease must not
-take the `latest` dist-tag. Never commit `*.tgz` or `SHA256SUMS.txt`; both are in
-`.gitignore`, because a committed checksum can go stale against the tarball the tag
-actually points at.
+含 `-` 的 tag（例如 `v0.3.0-rc.1`）会自动标记 `--prerelease`，`publish.yml` 仍会尝试 npm
+发布；若预发布不应占据 `latest` dist-tag，需传 `--tag next`。
 
-## Three claims in the README depend on measurement
+## 仓库公开之后
 
-Keep them honest as releases move:
+1. **由 CI 发布到 npm。** `.github/workflows/publish.yml` 在 `release: published` 上运行，
+   重新测试、把打包件装进临时前缀跑一遍可执行文件，然后 `npm publish --provenance`。缺少
+   `NPM_TOKEN` 时它跳过而不是失败，因此没有该 secret 的仓库不会出现红色流水线：
 
-- the **compatibility table** separates tested from declared and names the verification
-  date. Re-verify per release, or the table silently becomes fiction;
-- the **coverage table** (drillable share and allowlist-pass share) is measured on one
-  machine. If you republish it, re-measure; do not average it across users or present it as
-  typical;
-- the **prior-art table** describes other people's repositories, which change without
-  telling you. Re-read their source before repeating any cell — a wrong claim about a
-  competitor is the failure mode this section exists to avoid.
+   ```sh
+   gh secret set NPM_TOKEN --repo <you>/dsh-rehearsal --body "<granular access token, Publish scope>"
+   gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z
+   ```
+
+   也可以从本机发布，但这台机器上有个陷阱：`~/.npmrc` 的默认 `registry` 是
+   `registry.npmmirror.com`，一个只读镜像，对 `npm whoami` 返回 404 且不接受发布。要么用 CI，
+   要么显式同时传入覆盖项：
+
+   ```sh
+   npm publish --registry https://registry.npmjs.org   # 需要该 registry 的 auth token
+   ```
+
+   2026-10-02 时 `dsh-rehearsal` 这个包名仍无人占用（registry 404）。社区有占名不发布的习惯，
+   因此确认可发布时再占。
+2. **设置 topics。** `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`
+   （topics 需要 `repo` scope）。`dsh-plugin` 只能作为检索入口添加：本仓库刻意不是
+   `dsh plugin add` 的 bundle，README 头部已写明。不要让 topic 变成安装声明。
+
+3. **不要向 `awesome-dsh-plugin/awesome-dsh-plugin` 投稿。** 2026-10-02 核实：其
+   `scripts/check-submission.mjs:258-264` 要求仓库内某个 `package.json` 声明 `dsh.bundle`，
+   只声明 `dsh.client` 会被以"that alone is not installable"拒绝。与本仓库同为外部 CLI 的
+   `dsh-plugin-reducer` 与 `dsh-canary` 在其生成列表中同样 0 命中（4,412 条）。投稿会消耗一个
+   CI 门槛的 PR，并因一条正确的规则被拒：出现在那里意味着本工具刻意不具备的可安装性。
+
+   描述文件的键是白名单（`scripts/lib/entries.mjs:136`：`url, name, category, description,
+   tarball, file`，未知键直接 CI 失败），可选的 `tarball` 必须是 https、GitHub Release 托管、
+   以 `.tgz` 结尾 —— `release.yml` 附上的正是这个形状。
+
+   适合收录的位置：
+   - `walkinglabs/awesome-deepseek-harness-plugins` → `docs/INCLUSION_POLICY.md` 第 4 条：
+     "It is a client, launcher, or development resource … placed outside the plugin categories
+     and labelled accordingly."
+   - `awesome-deepseekharness/awesome-deepseek-harness` → `CONTRIBUTING.md`，类别
+     `🧩 Tools, Workflows & Presets`；该列表要求在同一位置同时插入 `README.md`（英文）与
+     `README.zh.md`（中文）条目，示例 PR 标题为 `Add owner/repo to Category`。
+
+   截至 2026-10-03，两处均未提交。
+
+4. **有收录之后再加注册表徽章**（npm version/downloads、dshfind、marketplace）。提前添加的
+   徽章会 404。`dsh-doctor` 的门禁徽章不适用：它的 R/K/D 门评分对象是 `dsh.bundle` 包，
+   本仓库不声明该字段。
+5. 首个 workflow 跑绿后，复核 README 头部的 CI 徽章可解析：`gh run list --repo <you>/dsh-rehearsal`。
+
+## 容易被破坏的文档约束
+
+- 所有文档均为双语对：`README.md` / `README.en.md`、`CHANGELOG.zh.md` / `CHANGELOG.md`、
+  `SECURITY.md` / `SECURITY.en.md`、`PUBLISHING.md` / `PUBLISHING.en.md`、
+  `docs/FAILURE_MODES.md` / `docs/FAILURE_MODES.en.md`。`test/docs.test.js` 会在缺失对开文件、
+  两份的 `## ` 标题数不一致、语言切换行指向不存在的文件、或某条 `file:line` 引用只出现在
+  一半时失败。
+- 行文为陈述式且无第一人称：主张与出处相邻，不以警句替代机制，破折号克制，加粗只用于标识符
+  与严重级别。用 `grep -c` 统计第一人称标记与 `——` 数量来验证，而不是靠目测。
+- 有三处结论依赖测量，且会自行过期：
+  - **兼容性表**分列实测与声明并写明验证日期，每次发版重测；
+  - **覆盖率表**（可预演占比、通过允许清单占比）来自单机测量，重新发布要重新测，
+    不要跨用户取平均或表述为普遍水平；
+  - **同类对比表**描述的是别人的仓库，对方会不通知就变更。重复任何一格前先重读对方源码：
+    对同类项目做出错误描述，正是这一节要避免的失败模式。
