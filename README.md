@@ -2,177 +2,201 @@
 
 # 🎬 dsh-rehearsal
 
-**Should I upgrade DeepSeek Harness? Rehearse it first** — against a candidate `dsh` version, your own plugin set, and *copies of your real sessions*, keyless, in a throwaway `DSH_HOME`.
+**要不要升 DeepSeek Harness？先彩排一遍** —— 用候选 `dsh` 版本 + 你自己的插件集 + **你真实会话的副本**，无 API 键，在全新的 `DSH_HOME` 里跑一次，产出升级决策报告。
 
-[![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.19-brightgreen.svg)](#compatibility)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](#compatibility)
-[![dsh-plugin](https://img.shields.io/badge/dsh--plugin-tooling-green)](https://github.com/topics/dsh-plugin)
+[简体中文](README.md) | [English](README.en.md)
 
-*A standalone command-line tool. Not a `dsh plugin add` bundle, and deliberately not a fourth single-plugin canary.*
+[![license](https://img.shields.io/badge/license-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
+[![stars](https://img.shields.io/github/stars/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/stargazers)
+[![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe?style=flat-square)](https://github.com/topics/dsh-plugin)
+[![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
-[English](README.md) · [简体中文](README.zh.md)
+*独立命令行工具。不是 `dsh plugin add` 的 bundle，也刻意不去做第四个"单插件 canary"。*
 
 </div>
 
 ---
 
-## Why an external CLI, not a plugin
+## 这是什么
 
-A rehearsal tool that lives inside the profile it is rehearsing **dies exactly when it matters most**. The upstream reports this tool was built from are full of that failure mode: [`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294) is a `host-boot` 120 s RPC timeout that ends in recovery mode with **no plugin-level attribution at all**, and the reporter notes the *identical* configuration booted fine on the second try.
+两条命令，一个结论：
 
-So `dsh-rehearsal` drives the candidate `dsh` as a **child process in its own home directory**, from outside the host:
+| 命令 | 作用 |
+| --- | --- |
+| `check --candidate <版本>` | **静态升级体检**：只读、零下载、秒级。活 profile 识别、四层 patch 叠层、精确版本、peer 图（区分"本次升级引入"与"今天就已坏"）、会话代际分布 |
+| `run --to <版本>` | **真彩排**：私有前缀装候选 → 两次冷启动 → 对你真实会话的副本触发惰性迁移 `v0→…→v4` → 读侧完整性 → **无键写回合**（官方 `dsh-llm-replay`） |
 
-- it never touches your live profile, and cannot — it installs the candidate itself and points `DSH_HOME` at a private directory;
-- it still works when the installed harness will not start;
-- every conclusion is backed by an artifact on disk (`report.json`), not by a log you read by eye.
+产出 `dsh-rehearsal/v1` 报告（`report.json` + `report.md`），退出码可直接接进脚本：`0` 可升 · `1` 带条件可升 · `2` 不可升 · `3` 彩排自身失败。
 
-> **Relationship to official gating.** `dsh-plugin-manager` enforces declared peer ranges at *install and startup* and offers exact-version exemptions (`dsh plugin allow-version … --accept-risk`). That is a runtime guardrail. This tool answers the earlier question — *what will break if I move to version X*, including session data that only breaks when something writes to it — and it runs **before** you commit to the upgrade. Complementary, not duplicative.
+装法（已实测可用，无需 npm 注册）：
 
-## Compatibility
+```sh
+npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+dsh-rehearsal check --candidate 0.2.0-rc.2
+```
 
-Verified on a real machine, 2026-10-02:
+## 为什么是外部 CLI，而不是插件
 
-| Component | Version |
+一个装在待测 profile 里的彩排工具，**会恰好在最需要它的时候一起死掉**。这个工具立项所依据的上游报告就是这个形状：[`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294) 里 `host-boot` 卡到 120 秒 RPC 超时、进恢复模式，**日志里没有任何插件级定位信息**，而提报告的人同时发现**完全相同的配置第二次启动就正常**。
+
+所以 `dsh-rehearsal` 把候选 `dsh` 当作**自己家目录里的子进程**来驱动，从宿主外面向内看：
+
+- 不碰、也碰不到你的活 profile —— 候选由它自己 npm 安装，`DSH_HOME` 指向私有目录；
+- 已装的 harness 起不来时它照样能跑；
+- 每条结论都对应磁盘上一个产物（`report.json`），而不是靠人眼读日志。
+
+> **与官方门禁的分工。** `dsh-plugin-manager` 在**安装与启动时**按声明的 peer 范围拦截，并提供精确版本豁免（`dsh plugin allow-version … --accept-risk`）。那是运行期护栏。本工具回答更早的问题 —— **升到 X 会发生什么**，包括只有被写入时才暴露的会话数据 —— 而且是在你提交升级**之前**。互补，不重复。
+
+## 兼容性
+
+2026-10-02 在真实机器上验证：
+
+| 组件 | 版本 |
 |---|---|
-| Candidate `dsh` (installed by this tool into a private prefix) | **`0.2.0-rc.2`** — `--sample 9 --preset-mode patch`: 9/9 real sessions migrated v0→v4, 1 keyless write round `pass` |
-| Current runtime detection | probes the profile's `node_modules`, the shared `profiles/node_modules`, the **DSH Desktop** bundle (`…/resources/app/node_modules/@deepseek-ai/dsh`), then the npm prefix |
-| Session format generations | `v0` (`session.jsonl.zstd`), `v3`, `v4`; migration chain `v0→…→v4` exercised against real logs |
-| Node.js | `>=22.19` (needs `node:zlib` zstd, added in v22.15.0, still *Stability: 1 – Experimental*) |
-| Package manager | `npm` (located without `PATH` assumptions; used to install the candidate, never your profile) |
-| Platform | Windows / macOS / Linux — CI matrix `3 OS × Node 22.19, 24.x` |
-| Runtime dependencies | **one**: `semver` |
-| Credentials | **none required, ever** — see [Safety by construction](#safety-by-construction) |
+| 候选 `dsh`（由本工具装进私有前缀） | **`0.2.0-rc.2`** —— `--sample 9 --preset-mode patch`：9/9 个真实会话完成 v0→v4 迁移，1 次无键写回合 `pass` |
+| 当前运行时探测 | 依次探 profile 的 `node_modules`、共享 `profiles/node_modules`、**DSH Desktop** 内置体（`…/resources/app/node_modules/@deepseek-ai/dsh`）、npm 前缀 |
+| 会话格式代际 | `v0`（`session.jsonl.zstd`）、`v3`、`v4`；迁移链 `v0→…→v4` 已对真实日志跑通 |
+| Node.js | `>=22.19`（需要 `node:zlib` 的 zstd，v22.15.0 引入，仍标 *Stability: 1 – Experimental*） |
+| 包管理器 | `npm`（不依赖 `PATH` 语义定位，只用来装候选，绝不装你的 profile） |
+| 平台 | Windows / macOS / Linux —— CI 矩阵 `3 OS × Node 22.19, 24.x` |
+| 运行时依赖 | **只有 1 个**：`semver` |
+| 凭据 | **任何阶段都不需要** —— 见[构造即安全](#构造即安全) |
 
-**Not supported (by design):** rehearsing the Electron-owned `desktop` profile through the npm CLI. `dsh` hard-refuses it (`profile "desktop" is managed exclusively by the Electron application`), and an npm-installed candidate is a *different dependency closure* than the Desktop bundle. `check` still covers a `desktop` profile — it only parses files. `run` targets npm / self-hosted `web` and `headless` profiles.
+**不支持（且是设计决定）：** 通过 npm CLI 彩排 Electron 拥有的 `desktop` profile。`dsh` 直接硬拒（`profile "desktop" is managed exclusively by the Electron application`），而且 npm 装的候选与 Desktop 内置体是**两套不同的依赖闭包**。`check` 仍可覆盖 `desktop` profile —— 它只解析文件。`run` 面向 npm / 自托管的 `web`、`headless` profile。
 
-## What you get
+## 你得到什么
 
-### `check` — static upgrade pre-flight (read-only, no downloads, seconds)
+### `check` —— 静态升级体检（只读、零下载、秒级）
 
-- picks the **live profile** instead of assuming `web` (measured: one machine had `desktop` = 11 bundles / 198 patch lines vs `web` = 4 / 4);
-- resolves the patch layering (`dsh.profile.bundles` order → profile `cordis.patch.yml` → home-level `cordis.patch.yml` → `--patch`), exact installed versions from `pnpm-lock.yaml`, and the `pnpm-workspace.yaml` policies that change install semantics (`autoInstallPeers`, `allowBuilds`, `minimumReleaseAgeExclude`);
-- analyses the **peer graph**: plugin↔dsh, plugin↔plugin, conflicting `@deepseek-ai/cordis` pins, version-*enumerated* ranges (the prerelease-caret footgun: `^0.1.7-rc.2` does not match `0.2.0-rc.2`, so authors list every rc by hand), and non-reproducible `link:` / `file:` / `github:` deps;
-- grades each finding **newly broken by this upgrade** vs **pre-existing** — a mismatch that already exists today is not this upgrade's fault and does not block.
+- 自动挑出**活 profile**，绝不默认 `web`（实测一台机器上 `desktop` = 11 bundles / 198 行 patch，`web` 只有 4 / 4）；
+- 解析 patch 叠层（`dsh.profile.bundles` 顺序 → profile 的 `cordis.patch.yml` → home 级 `cordis.patch.yml` → `--patch`）、从 `pnpm-lock.yaml` 取精确版本、以及会改变安装语义的 `pnpm-workspace.yaml` 策略（`autoInstallPeers`、`allowBuilds`、`minimumReleaseAgeExclude`）；
+- **peer 图分析**：插件↔dsh、插件↔插件、`@deepseek-ai/cordis` 多 pin 冲突、**枚举式** peer 范围（prerelease caret 的坑：`^0.1.7-rc.2` 不匹配 `0.2.0-rc.2`，于是作者只能手写每一个 rc）、以及 `link:` / `file:` / `github:` 不可复现依赖；
+- 每条发现区分**本次升级引入**与**今天就已存在** —— 今天就已经错配的不是这次升级的锅，不阻断。
 
-### `run --to <version>` — the rehearsal
+### `run --to <版本>` —— 彩排本体
 
 ```
-private prefix install (candidate dsh, scripts denied)
-  → two cold boots (first-boot flakiness is real upstream: #1294)
-  → lazy migration drill on copies of your real sessions (v0 → … → v4)
-  → read-side integrity (full multi-frame decode, seq contiguity, bidirectional turn balance)
-  → keyless write round via the official @deepseek-ai/dsh-llm-replay
+私有前缀安装候选（默认禁构建脚本）
+  → 两次冷启动（首启抖动是真实存在的上游问题：#1294）
+  → 对你真实会话的副本触发惰性迁移（v0 → … → v4）
+  → 读侧完整性（完整多帧解码、seq 连续、turn 双向闭合）
+  → 用官方 @deepseek-ai/dsh-llm-replay 做无键写回合
 ```
 
-The last stage is the point of this tool. Migration is **lazy and only happens on open**, and read-side checks pass on data that cannot be written to again — upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) is exactly a session that opens fine and then fails every turn. So the rehearsal opens a migrated copy and **attempts a write round**, with no API key: `dsh-llm-replay` reconstructs the model stream from the session's own recorded history.
+最后一步是这个工具的立身之本。迁移是**惰性的、只在打开时发生**，而读侧检查会在"打得开但写不进去"的数据上判通过 —— 上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) 就是一份"打开正常、每个回合必炸"的会话。所以彩排会在迁移后的副本上**真的写一轮**，且不需要 API 键：`dsh-llm-replay` 用该会话自己的录制流重建模型响应。
 
-### `dsh-rehearsal/v1` report
+### `dsh-rehearsal/v1` 报告
 
-`report.json` + `report.md` per stage (`verdict` / `durationMs` / `details` / `evidence`), stage records shaped after `dsh-test-drive/v1`, plus a fixed `coverage` block, a top-level `warnings[]`, and a `privacy` block stating exactly what was stripped. Exit codes are machine-checkable: **`0` upgrade OK · `1` upgrade with conditions · `2` do not upgrade · `3` the rehearsal itself failed**.
+每阶段 `report.json` + `report.md`（`verdict` / `durationMs` / `details` / `evidence`），阶段记录形状对齐 `dsh-test-drive/v1`，另有固定的 `coverage` 节、顶层 `warnings[]`，以及说明剥离了什么的 `privacy` 块。退出码可机器判定：**`0` 可升 · `1` 带条件可升 · `2` 不可升 · `3` 彩排自身失败**。
 
-## Safety by construction
+## 构造即安全
 
-Three independent layers, because "we suppressed tools" turned out not to be one assumption deep enough:
+三层互相独立 —— 因为"我们抑制了工具"这件事，深究后发现不止一层那么浅：
 
-1. **Sandboxed cwd.** `copySet` rewrites each copied session header's `cwd` into `<shadow>/workspace/<n>` *and* moves the copy to the matching encoded workspace directory — the harness derives the session path from `header.cwd`, so both must change together. No process ever runs with your real workspace as its root.
-2. **Tool rows disabled by default.** The replay patch disables tool-providing rows matched by **row id *and* package name** (`dsh-tool-`, `dsh-mcp-`, `dsh-skill`, `dsh-browser`, `dsh-terminal`, `dsh-jobs`, `terminal-`); the `tools` registry row stays, because the agent loop needs it. Replayed calls come back `isError` instead of executing.
-3. **Fail-closed read-only allowlist.** A replay can only emit tools that appear in that session's own history — deterministic, so pre-screening is complete, not a guess. A session is drilled only when **every** recorded tool is a known read-only builtin; `mcp__*`, exec/write classes, unknown third-party tools and unnamed rows all block, and each block is listed with its reason. Extraction covers **four row shapes** (`tool/call`, `tool-call-chunks`, `tool/ptc-dispatch`, `tool/code-dispatch[·start]`) — scanning only `tool/call` silently misses entire tools.
+1. **沙箱 cwd。** `copySet` 把每个副本会话 header 的 `cwd` 重写到 `<shadow>/workspace/<n>`，**同时**把副本搬到编码后对应的工作区别名目录 —— 宿主是从 `header.cwd` 反推会话物理路径的，两者必须一起改。任何进程都不会以你的真实工作区为根。
+2. **默认禁用工具行。** replay patch 同时按**行 id 与包名**抑制工具提供方（`dsh-tool-`、`dsh-mcp-`、`dsh-skill`、`dsh-browser`、`dsh-terminal`、`dsh-jobs`、`terminal-`）；`tools` 注册表行保留（agent loop 依赖它）。被重放的调用只会拿到 `isError`，而不是真的执行。
+3. **只读允许清单（fail-closed）。** replay 只能发出该会话**自己历史里出现过的工具** —— 这是确定性的，所以预筛是完整知识而非猜测。只有当历史工具**全部**属于已知只读内置集合时才演练：`mcp__*` 前缀、执行/写入类、未知的第三方工具、无名行一律拦下，并逐条记下原因。提取覆盖**四种行形态**（`tool/call`、`tool-call-chunks`、`tool/ptc-dispatch`、`tool/code-dispatch[·start]`）—— 只扫 `tool/call` 会静默漏掉整批工具。
 
-Plus, non-negotiable:
+此外是不可协商项：
 
-- **Keyless.** Every credential-shaped environment variable (`API_KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD|PRIVATE_KEY|AUTH`) is stripped from child processes; the *names* stripped are recorded, never the values. Nothing spends tokens, nothing ships your prompts to a provider.
-- **Telemetry off**: `DSH_TELEMETRY_MODE=DISABLED` (candidate `0.2.0` defaults to `FEEDBACK_ONLY`, and its OTLP path bypasses proxies).
-- **Verdicts from artifacts, never exit codes.** A *successful* keyless migration exits `1` with `MISSING_CREDENTIAL`; `--dump-config-schema` also exits `1` on success by design (`process.exitCode` when collection is incomplete) while writing valid JSON to stdout.
-- **Only our own candidate binary.** The `dsh` on `PATH` may be a Desktop shim that ignores `DSH_HOME` and writes to your real home — this happened during development, which is why it is now structurally impossible.
-- **Reports carry no message bodies.** `stderr` is filtered to diagnostic lines (replay echoes reasoning prose to `stderr`, and everything not matching a diagnostic shape is dropped *and counted*); evidence objects are scrubbed per string value (any drive-rooted path including ones with spaces → `<abs-path>`, home dirs → `~`, credential shapes → `[redacted]`). Session ids, type histograms, seq ranges and byte counts only.
-- **Cleanup on every exit path.** The shadow home holds full session copies plus *plaintext* decompressed fixtures, so it is removed in a `finally`, and the report records `shadowCleanup: removed|kept|failed`.
+- **无键。** 子进程环境里凡是形状像凭据的变量（`API_KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD|PRIVATE_KEY|AUTH`）全部剔除；报告只记被剔除的**变量名**，永不记值。不花 token，不把内容发给任何 provider。
+- **遥测关闭**：`DSH_TELEMETRY_MODE=DISABLED`（候选 `0.2.0` 默认 `FEEDBACK_ONLY`，且其 OTLP 直连绕过代理）。
+- **判定只认产物，绝不认退出码。** *成功*的无键迁移会以 `MISSING_CREDENTIAL` 退出 1；`--dump-config-schema` 设计上成功也退出 1（采集不完整时置 `exitCode`），同时把合法 JSON 写到 stdout。
+- **只用自己装的候选二进制。** `PATH` 上的 `dsh` 可能是无视 `DSH_HOME` 的桌面 shim，会写坏你的真实 home —— 开发期真发生过，所以现在从结构上不可能。
+- **报告零消息正文。** `stderr` 只保留诊断行（replay 会把推理正文写到 stderr；凡不匹配诊断形状的行一律丢弃并计数）；evidence 对象**逐字符串**脱敏（任意盘符绝对路径 —— 含空格的也算 —— → `<abs-path>`，家目录 → `~`，凭据形状 → `[redacted]`）。正文只会出现会话 id、类型直方图、seq 区间、字节数。
+- **任何退出路径都清理。** 影子 home 里有整份会话副本和**明文**解压 fixture，所以在 `finally` 里删除，并在报告记 `shadowCleanup: removed|kept|failed`。
 
-## Read the coverage numbers, not just the PASSes
+## 覆盖率请连数字一起读，别只读 PASS
 
-The write round is deliberately narrow: it needs a session whose entire recorded tool history is read-only. Measured on the machine this was built on (2026-10-02):
+写回合故意很窄：它要求一个会话**全部**录制过的工具都是只读的。在本机实测（2026-10-02）：
 
-| Stage | Count | Share |
+| 阶段 | 数量 | 占比 |
 |---|---|---|
-| sessions in library | 52 | — |
-| drillable (not yet v4, cwd usable) | 24 | 46% |
-| pass the read-only allowlist | **5** | 21% of drillable, **9.6% of the library** |
+| 会话总数 | 52 | — |
+| 可演练（未 v4 且 cwd 可用） | 24 | 46% |
+| 通过只读允许清单 | **5** | 可演练的 21%，**全库的 9.6%** |
 
-So **migration rehearsal is broad and write-path rehearsal is narrow**; do not quote one as the other. `coverage.writeRounds` reports `plainAttempts/plainPass/presetAttempts/presetPass/skippedWriteTools` and lists every blocked session with its tools, and `coverage.sessions.preset` exposes `inLibrary/drillable/selected/migrated` so "we drilled preset sessions" is checkable from the report rather than asserted in prose.
+也就是说**迁移彩排覆盖广、写路径彩排覆盖窄**，两者不能混着引用。`coverage.writeRounds` 给出 `plainAttempts/plainPass/presetAttempts/presetPass/skippedWriteTools` 并逐个列出被拦会话及其工具；`coverage.sessions.preset` 暴露 `inLibrary/drillable/selected/migrated` —— 于是"我们演练过预设会话"这句话可以由报告自证，而不是靠文档口述。
 
-Preset-carrying sessions deserve their own note: the one-shot runner refuses them, `--preset-mode patch` neutralises that one check **inside our private copy of the candidate**, and their composition is *not* reconstructed — those verdicts are format-level and labelled as such. Selection guarantees they are represented (plain stratum fills first, presets take the remainder with a floor of one), but their write rounds are still run and reported while never deciding the stage verdict: replay does not intercept a preset session's provider route, so a preset-only sample honestly yields `inconclusive`.
+带预设的会话值得单说：one-shot runner 会拒绝它们，`--preset-mode patch` 在**我们私有的候选副本**里中和那一个采用检查，且**不重建预设组合** —— 这类结论只有格式级，报告也这么标。采样保证它们一定被代表（非预设层先填满，预设层拿剩余并保底 1 个），但它们的写回合照跑照报，却不单独决定阶段结论：replay 不拦截预设会话的 provider 路由，所以只选到预设时诚实地判 `inconclusive`。
 
-## How this differs from what already exists
+## 与已有同类工具的差别
 
-The ecosystem is not empty, and pretending otherwise would waste your time — so, explicitly:
+这个生态并不空，装作空是在浪费你的时间 —— 所以明说：
 
-| Tool | What it does | What this adds |
+| 工具 | 它做什么 | 本工具补什么 |
 |---|---|---|
-| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | in-profile upgrade gate: contract pre-check, rollback point, auto-rollback, quarantines the plugin that broke boot | runs from outside, before you install anything, and can attribute a candidate version you have not adopted yet |
-| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) · [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | throwaway-profile install + boot smoke for **a plugin**, structured `v1` report, GitHub Action | rehearses the **core** version, with your whole pinned plugin set, against copies of **your** sessions |
-| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check`: static pre-upgrade scan predicting which sessions the new host will refuse, plus rescue console | opens and **writes** to migrated copies — the class of breakage that passes every read-side check |
-| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | static package gates, cordis contract scan, keyless headless smoke | cross-version aggregation and a go/no-go verdict rather than a per-plugin health check |
-| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | external CLI; minimises a profile to the smallest plugin set that reproduces a failure | forward-looking (pre-upgrade) instead of backward-looking (post-failure); complementary |
+| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | profile 内的升级门控：契约预检、回滚点、失败自动回滚、隔离拖垮启动的插件 | 从宿主外面跑，在你还没装任何东西之前，并且能针对你**尚未采用**的候选版本给归因 |
+| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) · [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | 一次性 profile 里对**某个插件**做安装+启动冒烟，结构化 `v1` 报告，GitHub Action | 彩排**核心版本**，带你整套钉死的插件集，并且对**你的**会话副本动手 |
+| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check`：升级前静态扫全部会话，预测哪些会被新宿主拒绝；另附救援控制台 | 在迁移后的副本上真的**打开并写一轮** —— 那是所有读侧检查都会放过的损坏类 |
+| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | 包结构门禁、cordis 契约扫描、无键无头冒烟 | 跨版本聚合与 go/no-go 结论，而不是单插件健康检查 |
+| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | 外部 CLI，把 profile 归约到能复现故障的最小插件集 | 面向未来（升级前）而不是事后（故障后）；互补关系 |
 
-## Quick start
+## 快速开始
+
+```sh
+# 安装（已实测：无需 npm 注册，走 GitHub tag）
+npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+
+dsh-rehearsal check --candidate 0.2.0-rc.2            # 只读体检，秒级
+dsh-rehearsal run --to 0.2.0-rc.2 --sample 20         # 完整彩排（首次要装候选，约 2-5 分钟）
+dsh-rehearsal clean --yes                             # 清理 .dsh-rehearsal 产物
+```
+
+从源码跑（开发／改代码）：
 
 ```sh
 git clone https://github.com/wuwaka/dsh-rehearsal.git && cd dsh-rehearsal
-npm install
-
-node src/cli.js check --candidate 0.2.0-rc.2          # read-only pre-flight, seconds
-node src/cli.js run --to 0.2.0-rc.2 --sample 20       # full rehearsal (first run installs the candidate: ~2-5 min)
-node src/cli.js clean --yes                           # remove .dsh-rehearsal artifacts
+npm install && npm test
+node src/cli.js check --candidate 0.2.0-rc.2
 ```
 
-Useful flags: `--profile`, `--home`, `--current` (override auto-detection), `--full`, `--preset-mode patch`, `--writeRounds N`, `--skip-write`, `--allow-tools`, `--run-scripts`, `--keep`, `--shadow-dir` / `--prefix-dir`.
+常用旗标：`--profile`、`--home`、`--current`（覆盖自动探测）、`--full`、`--preset-mode patch`、`--writeRounds N`、`--skip-write`、`--allow-tools`、`--run-scripts`、`--keep`、`--shadow-dir` / `--prefix-dir`。
 
-### Let an AI run it for you
+### 让 AI 替你跑
 
-Paste this to an agent that can drive a terminal:
+把这段话贴给能操作终端的 AI / agent：
 
-> Read-only pre-flight for a DeepSeek Harness upgrade on this machine. Clone or update `https://github.com/wuwaka/dsh-rehearsal`, run `npm install` then `node src/cli.js check --candidate <target-version>`, and report the verdict, every `high` finding with its plugin and peer range, and the session-generation distribution. Do not run `run` (it installs a candidate and replays copies of my sessions) without my explicit approval, do not modify any profile or `~/.dsh` file, and do not print any credential.
+> 在本机做一次只读的 DeepSeek Harness 升级预检。clone 或更新 `https://github.com/wuwaka/dsh-rehearsal`，跑 `npm install`，然后 `node src/cli.js check --candidate <目标版本>`，汇报结论、每一条 `high` 发现对应的插件与 peer 范围、以及会话代际分布。未经我明确同意**不要**跑 `run`（它会安装候选并重放我会话的副本）；不要改任何 profile 或 `~/.dsh` 文件；不要打印任何凭据。
 
-## Known limits (v1)
+## 已知边界（v1）
 
-- `--allow-tools` **really executes** recorded tool calls. The cwd stays sandboxed, but `pwsh`/`bash` can reach outside it with an absolute path. Opt in per session you trust.
-- Attachments are not copied or verified (`~/.dsh/attachments`, `cache/attachments`), so attachment-reference integrity is out of scope and stated as such rather than faked.
-- npm shadow ≠ Desktop installation: `run` cannot reproduce the Electron dependency closure (see [Compatibility](#compatibility)).
-- `rehearsal` measures the *write path*, not open-ended behaviour: the replay script is derived from that session's own recording, so tools and paths absent from the recording cannot appear.
-- `#1229`-class poison-row detection is built in but untriggerable on this machine's data (the `v3→v4` migration package has carried the `producerKind` rewrite since `0.2.0-rc.1`).
-- `run` still shares one `--sample` knob between the migration drill and the write-round pool; widening write coverage means raising `--sample`.
+- `--allow-tools` **会真的执行**记录里的工具调用。cwd 仍在沙箱里，但 `pwsh`/`bash` 可以用绝对路径走出去。只对你接受其历史副作用的会话开启。
+- 附件旁路数据不复制、不校验（`~/.dsh/attachments`、`cache/attachments`），附件引用完整性明确划在范围外而不是假装测过。
+- npm 影子 ≠ Desktop 安装体：`run` 复现不了 Electron 的依赖闭包（见[兼容性](#兼容性)）。
+- 彩排测的是*写路径可走通*，不是自由行为：replay 脚本派生自该会话自己的录制，录制里没有的工具和路径不会出现。
+- #1229 类毒行检测已内置，但在本机数据上无法触发（`v3→v4` 迁移包自 `0.2.0-rc.1` 起就带 `producerKind` 改写映射）。
+- `run` 目前仍用一个 `--sample` 同时决定迁移样本和写回合候选池；想要更宽的写覆盖就调大它。
 
-## Verifying that your real home was not touched
+## 怎么自证"没有污染真实 home"
 
-Three independent checks, which is how the audit trail for this project was built:
+三条互相独立的检查，这个项目的审计轨迹就是这么建的：
 
 ```sh
-# 1) every migrated session artifact in the REAL home must predate the rehearsal
+# 1) 真实库里所有迁移产物的 mtime 必须早于彩排时刻
 find ~/.dsh/sessions -name 'session.v4.jsonl.zstd' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -3
-# 2) no shadow home left behind (auto-cleaned unless --keep / --shadow-dir)
+# 2) 不留影子目录（除非 --keep / --shadow-dir，否则自动清理）
 ls -d "${TMPDIR:-/tmp}"/dsh-rehearsal-home-* 2>/dev/null | wc -l
-# 3) the report contains no home path and no replayed prose
-#    substitute your own username / drive layout for <TOKENS>
+# 3) 报告里没有家目录、没有正文（把 <TOKENS> 换成你自己的用户名与盘符关键词）
 node -e "const fs=require('fs');const d=fs.readdirSync('.dsh-rehearsal').sort().pop();\
 const t=fs.readFileSync('.dsh-rehearsal/'+d+'/report.json','utf8');\
 console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CLEAN')"
 ```
 
-## Development
+## 开发
 
 ```sh
-npm test        # 52 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
-                # peer grading / sandbox cwd rewrite + dir encoding / stderr sanitizer /
-                # structured scrubbing / read-only allowlist / env stripping /
-                # countRows structure / stratified selection / writeRoundVerdict /
-                # warnings rendering + scrubbing / end-to-end `check` CLI smoke
+npm test        # 52 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
+                # 沙箱 cwd 重写 + 目录编码 / stderr 消毒器 / 结构化脱敏 / 只读允许清单 /
+                # env 剔除 / countRows 结构 / 分层采样 / writeRoundVerdict /
+                # warnings 渲染与脱敏 / check 端到端 CLI 冒烟
 ```
 
-CI runs `npm ci` + `npm test` on **windows / macOS / linux × Node 22.19 and 24.x**, plus two guard assertions: the `node:zlib` zstd API this tool depends on must exist, and the test suite must not leave fixture homes in `$HOME`. **CI never runs `rehearsal run`** — it installs ~500 packages and replays real session copies, which is neither deterministic nor appropriate on a shared runner; the safety model is covered offline instead.
+CI 跑 `npm ci` + `npm test`，矩阵为 **windows / macOS / linux × Node 22.19 与 24.x**，外加两条护栏断言：本工具依赖的 `node:zlib` zstd API 必须存在；测试不得在 `$HOME` 留下夹具影子 home。**CI 从不跑 `rehearsal run`** —— 它会装约 500 个包并重放真实会话副本，在共享 runner 上既不确定也不合适；`run` 的安全模型改由离线单测覆盖。
 
-Before publishing, read [PUBLISHING.md](PUBLISHING.md): pushing this history as-is would publish a pre-scrub snapshot (13 real paths across 5 files). The repo ships a verified single-commit `publish-clean` branch for exactly that.
+发布前务必读 [PUBLISHING.md](PUBLISHING.md)：直接推现有历史会公开一个脱敏前的快照（13 处真实路径跨 5 个文件）。仓库已备好一个经过验证的单提交 `publish-clean` 分支专为此用。
 
 ---
 
-MIT License. Not affiliated with or endorsed by DeepSeek. `dsh` / DeepSeek Harness is upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness); the Desktop host and the active issue tracker are [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).
+MIT License。与 DeepSeek 无关联、未获其背书。`dsh` / DeepSeek Harness 上游在 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)；桌面壳与活跃缺陷跟踪在 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。

@@ -1,3 +1,7 @@
 node_modules/
 .dsh-rehearsal/
 *.log
+
+# build/packaging output (never commit: a blanket `git add -A` has bitten this repo before)
+*.tgz
+SHA256SUMS.txt
