@@ -8,7 +8,7 @@ import path from 'node:path';
 import { defaultHome, listProfiles, inspectProfile, pickLiveProfile, readSettingsShape, readMarketFacts, detectCurrentDshVersion } from '../lib/dshhome.js';
 import { discoverSessions } from '../lib/sessions.js';
 import { analyzePeerGraph } from '../lib/peers.js';
-import { newReport, addStage, finalize, toMarkdown } from '../lib/report.js';
+import { newReport, addStage, finalize, toMarkdown, homeShape } from '../lib/report.js';
 import { stageTimer } from '../lib/util.js';
 
 export async function cmdCheck(opts) {
@@ -37,8 +37,8 @@ export async function cmdCheck(opts) {
     blocking: true,
     durationMs: ms(),
     details: live
-      ? `home=${home}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
-      : `no usable profile found under ${home}`,
+      ? `home=${homeShape(home)}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
+      : `no usable profile found under the given DSH_HOME (home=${homeShape(home)})`,
     evidence: live
       ? [
           { live: live.name, ranked: profiles.filter((p) => p.exists).map((p) => ({ name: p.name, ...p.stats })), patchLayers: live.patchLayers, workspace: live.workspace ?? null, marketFacts: readMarketFacts(home, live.name) },

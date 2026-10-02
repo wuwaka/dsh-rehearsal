@@ -1,11 +1,38 @@
 // dsh-rehearsal/v1 report assembly, Markdown rendering and scrubbing.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { nowIso, redactedEnvNames } from './util.js';
+
+const pkgVersion = JSON.parse(
+  fs.readFileSync(path.join(import.meta.dirname, '..', '..', 'package.json'), 'utf8'),
+).version;
+
+/**
+ * Describe a DSH_HOME without putting its path in the report.
+ *
+ * Scrubbing a composed path is a filter with known gaps (a Unix home outside
+ * /home or /Users, a UNC share, a relative --home all pass through). The
+ * inventory line only needs to say whether the default location was used, so
+ * the path is never composed in the first place.
+ */
+export function homeShape(home) {
+  if (typeof home !== 'string' || !home) return 'unknown';
+  const def = process.env.DSH_HOME
+    || path.join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
+  const norm = (p) => path.resolve(p).replace(/[\\/]+$/, '');
+  try {
+    if (norm(home) === norm(def)) return 'default';
+  } catch {
+    return 'unknown';
+  }
+  return 'custom';
+}
 
 export function newReport({ candidateVersion, profile, command }) {
   return {
     schema: 'dsh-rehearsal/v1',
-    tool: { name: 'dsh-rehearsal', version: '0.1.0' },
+    tool: { name: 'dsh-rehearsal', version: pkgVersion },
     command,
     generatedAt: nowIso(),
     target: { candidateVersion: candidateVersion ?? null, profile: profile ?? null },

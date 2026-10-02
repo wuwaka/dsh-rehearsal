@@ -2,8 +2,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newReport, addStage, finalize, toMarkdown, scrubText } from '../src/lib/report.js';
+import { newReport, addStage, finalize, toMarkdown, scrubText, homeShape } from '../src/lib/report.js';
 import { extractRoutes } from '../src/lib/drill.js';
+import path_module from 'node:path';
 
 test('scrubText removes user paths and credential shapes', () => {
   const s = scrubText('cwd was C:\\Users\\Jane\\AppData\\Local\\Temp and /home/alice/x and key sk-abcdefghijklmnop1234 Bearer abc.def');
@@ -145,4 +146,27 @@ test('run-level warnings surface in JSON, Markdown and are scrubbed (round 4)', 
   const md = toMarkdown(r);
   assert.match(md, /WARNING/);
   assert.ok(md.includes('no preset-carrying session'), 'markdown must show the caveat next to the verdict');
+});
+
+test('homeShape describes a DSH_HOME without ever returning its path', () => {
+  const p = path_module;
+  const def = process.env.DSH_HOME || p.join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
+  assert.equal(homeShape(def), 'default');
+  assert.equal(homeShape(def + p.sep), 'default', 'a trailing separator is still the default');
+  const BS = String.fromCharCode(92);
+  const customHomes = [
+    '/srv/users/alice/dsh-home',
+    '/var/lib/jenkins/.dsh',
+    'dsh-home',
+    '../.dsh',
+    BS + BS + 'fileserver' + BS + 'team' + BS + 'dsh',
+    'E:' + BS + 'work' + BS + 'zhang' + BS + '.dsh',
+  ];
+  for (const custom of customHomes) {
+    const out = homeShape(custom);
+    assert.ok(['custom', 'unknown'].includes(out), `must classify ${custom}, got ${out}`);
+    assert.ok(!out.includes('/') && !out.includes(BS), 'the returned shape must never contain a path separator');
+  }
+  assert.equal(homeShape(''), 'unknown');
+  assert.equal(homeShape(undefined), 'unknown');
 });

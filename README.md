@@ -64,17 +64,19 @@ dsh-rehearsal clean --yes                       # 清理产物
 
 ## 输出长什么样
 
-`check` 的实际输出（已隐去本机 profile 名）：
+`check` 的实际输出（`profiles` 与代际分布做了省略，本机 profile 名不在其中）：
 
 ```text
 dsh-rehearsal check — verdict: upgrade-with-conditions
-  [PASS        ] a-inventory — profiles=[…]; live=desktop (bundles=11, patchRows=16,
-                 plugins=10, 3 non-reproducible); sessions=52 (v0=…, v3=…, v4=…)
+  [PASS        ] a-inventory — home=default; profiles=[…]; live=desktop (bundles=11,
+                 patchRows=16, plugins=10, 3 non-reproducible); sessions=52 (…)
   [WARN        ] b1-peer-graph — 10 plugins analyzed against candidate=0.2.0-rc.2
                  current=0.2.0-rc.2; 19 findings (0 newly-broken high, 9 pre-existing)
 rollback note: sessions migrated to v4 are REFUSED (not rewritten) by older hosts —
 downgrade after migration is not possible; rollback relies on a pre-upgrade snapshot
 ```
+
+`home=default` 而不是路径：报告里的 DSH_HOME 字段只写形状（`default` / `custom`），绝对路径不进入字符串。
 
 退出码：
 

@@ -64,17 +64,19 @@ Everything else is in `dsh-rehearsal --help`.
 
 ## What the output looks like
 
-Actual `check` output, with local profile names removed:
+Actual `check` output (the `profiles` list and generation histogram are elided; local profile names are not among them):
 
 ```text
 dsh-rehearsal check — verdict: upgrade-with-conditions
-  [PASS        ] a-inventory — profiles=[…]; live=desktop (bundles=11, patchRows=16,
-                 plugins=10, 3 non-reproducible); sessions=52 (v0=…, v3=…, v4=…)
+  [PASS        ] a-inventory — home=default; profiles=[…]; live=desktop (bundles=11,
+                 patchRows=16, plugins=10, 3 non-reproducible); sessions=52 (…)
   [WARN        ] b1-peer-graph — 10 plugins analyzed against candidate=0.2.0-rc.2
                  current=0.2.0-rc.2; 19 findings (0 newly-broken high, 9 pre-existing)
 rollback note: sessions migrated to v4 are REFUSED (not rewritten) by older hosts —
 downgrade after migration is not possible; rollback relies on a pre-upgrade snapshot
 ```
+
+`home=default`, not a path: the DSH_HOME field in a report records a shape (`default` / `custom`), so no absolute path enters the string.
 
 Exit codes:
 

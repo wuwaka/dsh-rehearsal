@@ -29,6 +29,16 @@
   提交哈希集合一致、语言切换行指向真实文件、无第一人称（测试数 61 → 68）。
 - 新增仓库海报 `assets/poster.jpg` 与 `assets/social-preview.jpg`。
 
+### 修复
+
+- `a-inventory` 的 `details` 原先把 `DSH_HOME` 原值拼进字符串，靠 `finalize()` 的正则遮罩。该正则识别
+  `C:\Users\<n>`、`/home/<n>`、`/Users/<n>` 与任意盘符路径，但**相对路径、UNC 共享、以及
+  `/srv/users/<n>` 这类非标准 Unix 家目录会原样进入报告**（A/B 实测：修复前 `home=dsh-home` 泄漏，
+  修复后为 `home=custom`）。该字段改为只写形状，路径不再进入字符串。
+- `report.tool.version` 硬编码为 `0.1.0`，已与 `package.json` 脱节；现改为从 `package.json` 读取。
+- 回归锁：`homeShape` 的返回值不得含路径分隔符；端到端用**相对** `--home` 跑 `check`，断言该路径
+  不出现在报告任何位置（测试数 68 → 70）。
+
 ## [0.2.0] - 2026-10-02
 
 文档与发布可核验性。`check` 与 `run` 的行为**没有任何改动**。

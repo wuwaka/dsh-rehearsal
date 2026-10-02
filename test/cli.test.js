@@ -79,6 +79,36 @@ test('check runs end-to-end on a synthetic home and emits a valid v1 report', (t
   assert.match(md, /\| stage \| verdict \| ms \| notes \|/);
 });
 
+test('a non-standard --home never reaches the report, relative or absolute', (t) => {
+  // Regression lock: the inventory line used to interpolate the raw --home
+  // value and rely on scrubText to mask it. scrubText knows C:\Users\,
+  // /home/ and /Users/ - a relative --home, a UNC share or a Unix home under
+  // /srv or /var/lib passed straight through. The path is now never composed.
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-rel-home-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const rel = 'dsh-home';
+  const prof = path.join(parent, rel, 'profiles', 'web');
+  fs.mkdirSync(prof, { recursive: true });
+  fs.writeFileSync(
+    path.join(prof, 'package.json'),
+    JSON.stringify({
+      name: 'dsh-profile-web',
+      dsh: { profile: { bundles: ['@deepseek-ai/dsh-base'] } },
+      dependencies: { '@deepseek-ai/dsh-base': '^0.2.0-rc.1' },
+    }, null, 2),
+  );
+  const artifacts = path.join(parent, 'artifacts');
+  const r = spawnSync(process.execPath, [CLI, 'check', '--home', rel, '--candidate', '0.2.0-rc.2', '--artifacts', artifacts], {
+    cwd: parent, encoding: 'utf8', windowsHide: true, timeout: 120000,
+  });
+  assert.ok([0, 1, 2].includes(r.status), `exit code must be a decision (got ${r.status}): ${r.stderr}`);
+  const raw = fs.readFileSync(path.join(artifacts, 'report.json'), 'utf8');
+  assert.ok(!raw.includes(rel), 'the relative --home value must not be echoed into the report');
+  assert.ok(!raw.includes(parent), 'the absolute fixture root must not be echoed either');
+  const details = JSON.parse(raw).stages.find((s) => s.id === 'a-inventory').details;
+  assert.match(details, /home=(default|custom|unknown);/, 'inventory must describe the home, not print it');
+});
+
 test('check distinguishes a candidate that newly breaks peers from one that is already broken', (t) => {
   const home = buildFixture(t);
   const prof = path.join(home, 'profiles', 'web');

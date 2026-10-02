@@ -32,6 +32,8 @@ The properties below are enforced in code and covered by tests. A report that an
 
 `report.json` and `report.md` derive from local session data. Redaction is a filter, not a proof: do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
+The filter recognizes a bounded set of shapes: `C:\Users\<name>`, `/home/<name>` and `/Users/<name>` collapse to `~`, and any drive-rooted absolute path collapses to `<abs-path>`. It does **not** recognize a Unix home outside `/home` (for example `/srv/users/<name>` or `/var/lib/<service>`), a UNC share, or a relative path. Fields that must appear in a report and would otherwise carry such a value now record a shape instead (`home=default|custom|unknown`) so the path never enters the string: relying on a regex to mask a shape known to slip through is not a sound design. Other free-text fields remain covered by that bounded set only.
+
 ## Out of scope
 
 - Not a sandbox against a hostile candidate `dsh`. A rehearsal runs a build of the harness under evaluation; file-level precautions do not apply to a malicious build.

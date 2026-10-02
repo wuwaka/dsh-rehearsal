@@ -25,6 +25,19 @@ refuses to publish when either lacks the section for a tag.
 - Every document is a bilingual pair. `test/docs.test.js` asserts the pair exists, section counts match, `file:line` citations, issue numbers and commit hashes agree, language switch lines resolve, and no document drifts back into first person (test count 61 → 68).
 - Added repository images `assets/poster.jpg` and `assets/social-preview.jpg`.
 
+### Fixed
+
+- The `a-inventory` `details` string interpolated the raw `DSH_HOME` and relied on the `finalize()`
+  regexes to mask it. Those regexes cover `C:\Users\<n>`, `/home/<n>`, `/Users/<n>` and any
+  drive-rooted path, but **a relative `--home`, a UNC share, or a Unix home outside `/home` such as
+  `/srv/users/<n>` reached the report verbatim** (measured A/B: `home=dsh-home` leaked before the
+  change, `home=custom` after). The field now records a shape, so no path enters the string.
+- `report.tool.version` was hard-coded to `0.1.0` and had drifted from `package.json`; it is now read
+  from `package.json`.
+- Regression locks: `homeShape` must never return a value containing a path separator, and an
+  end-to-end `check` with a **relative** `--home` asserts that the path appears nowhere in the report
+  (test count 68 → 70).
+
 ## [0.2.0] - 2026-10-02
 
 Documentation and release integrity. No behaviour change to `check` or `run`.
