@@ -3,11 +3,19 @@
 // this module never spawns dsh and never writes to the scanned home.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { countRows, simpleListAfter } from './yaml-lite.js';
 
+/**
+ * Never throws. With neither USERPROFILE nor HOME set (a bare container), the
+ * old expression reached path.join(undefined, '.dsh') and the CLI died with
+ * Node's "path argument must be of type string" instead of a usable answer.
+ */
 export function defaultHome() {
-  return process.env.DSH_HOME || path.join(process.env.USERPROFILE || process.env.HOME, '.dsh');
+  if (process.env.DSH_HOME) return process.env.DSH_HOME;
+  const base = process.env.USERPROFILE || process.env.HOME || os.homedir() || process.cwd();
+  return path.join(base, '.dsh');
 }
 
 export function listProfiles(home) {

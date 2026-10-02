@@ -47,6 +47,20 @@ refuses to publish when either lacks the section for a tag.
   any surviving path-shaped text in `warnings[]` (`redaction gap: …`), so a future stage that composes
   an unknown style admits it instead of publishing the path silently (test count 70 → 73).
 
+- `privacy.scrubbed: true` was set in `newReport()`, i.e. the report claimed to be scrubbed at
+  construction time. The redaction-gap invariant lives inside `finalize()`, so the scenario raised in
+  review — a stage that bypasses `finalize()` — was **not** covered by it. The field is now written by
+  `finalize()` from the invariant's own result, so a report that did not fully pass reports `false`,
+  and `writeReport()` became the single writer that finalizes an un-finalized report on the way to disk.
+- `check` without `--candidate` printed `0 newly-broken high` as if it were a result. That number is
+  now labelled: the stage reports `warn`, its details say the comparison was not exercised, a
+  `warnings[]` entry says the same, and the exit code is `1` rather than `0`.
+- `defaultHome()` reached `path.join(undefined, '.dsh')` when both `USERPROFILE` and `HOME` are absent
+  (a bare container), throwing a raw `TypeError`; it now falls back to `os.homedir()` and then the
+  working directory. Fixing it exposed a drift in the same area: `homeShape()` recomputed the default
+  location itself and disagreed with the hardened `defaultHome()`, labelling a genuine default as
+  `custom`; the caller now passes one source of truth in (test count 73 → 78).
+
 ## [0.2.0] - 2026-10-02
 
 Documentation and release integrity. No behaviour change to `check` or `run`.

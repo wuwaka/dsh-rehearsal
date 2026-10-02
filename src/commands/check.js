@@ -8,7 +8,7 @@ import path from 'node:path';
 import { defaultHome, listProfiles, inspectProfile, pickLiveProfile, readSettingsShape, readMarketFacts, detectCurrentDshVersion } from '../lib/dshhome.js';
 import { discoverSessions } from '../lib/sessions.js';
 import { analyzePeerGraph } from '../lib/peers.js';
-import { newReport, addStage, finalize, toMarkdown, homeShape } from '../lib/report.js';
+import { newReport, addStage, finalize, toMarkdown, homeShape, writeReport } from '../lib/report.js';
 import { stageTimer } from '../lib/util.js';
 
 export async function cmdCheck(opts) {
@@ -37,8 +37,8 @@ export async function cmdCheck(opts) {
     blocking: true,
     durationMs: ms(),
     details: live
-      ? `home=${homeShape(home)}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
-      : `no usable profile found under the given DSH_HOME (home=${homeShape(home)})`,
+      ? `home=${homeShape(home, defaultHome())}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
+      : `no usable profile found under the given DSH_HOME (home=${homeShape(home, defaultHome())})`,
     evidence: live
       ? [
           { live: live.name, ranked: profiles.filter((p) => p.exists).map((p) => ({ name: p.name, ...p.stats })), patchLayers: live.patchLayers, workspace: live.workspace ?? null, marketFacts: readMarketFacts(home, live.name) },
@@ -75,15 +75,22 @@ export async function cmdCheck(opts) {
   const findings = analyzePeerGraph(pluginDetails, { candidate: opts.candidate, current });
   const blockingFindings = findings.filter((f) => f.severity === 'high');
   const preExisting = findings.filter((f) => f.kind === 'peer-incompatible-pre-existing');
+  const noCandidate = !opts.candidate;
   addStage(report, {
     id: 'b1-peer-graph',
     title: 'static peer graph (no downloads)',
-    verdict: blockingFindings.length ? 'fail' : findings.length ? 'warn' : 'pass',
+    // Without a candidate there is nothing to compare against: the
+    // newly-broken count would be a number computed from no input. Report the
+    // static facts, but say the headline question was not asked.
+    verdict: noCandidate ? 'warn' : blockingFindings.length ? 'fail' : findings.length ? 'warn' : 'pass',
     blocking: true,
     durationMs: ms(),
-    details: `${pluginDetails.length} plugins analyzed against candidate=${opts.candidate ?? 'n/a'} current=${current ?? 'n/a'}; ${findings.length} findings (${blockingFindings.length} newly-broken high, ${preExisting.length} pre-existing)`,
+    details: `${noCandidate ? 'no --candidate given, newly-broken comparison NOT exercised; ' : ''}${pluginDetails.length} plugins analyzed against candidate=${opts.candidate ?? 'n/a'} current=${current ?? 'n/a'}; ${findings.length} findings (${blockingFindings.length} newly-broken high, ${preExisting.length} pre-existing)`,
     evidence: findings,
   });
+  if (noCandidate) {
+    report.warnings.push('no --candidate: the "0 newly-broken high" figure is an unrun comparison, not a clean result. Re-run with --candidate <version> to answer the upgrade question.');
+  }
 
   finalize(report);
   writeArtifacts(artifactsDir, report);
@@ -92,7 +99,8 @@ export async function cmdCheck(opts) {
 }
 
 export function writeArtifacts(dir, report) {
-  fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report, null, 2));
-  fs.writeFileSync(path.join(dir, 'report.md'), toMarkdown(report));
+  // routed through writeReport so an un-finalized report cannot reach disk
+  // claiming privacy.scrubbed=true
+  writeReport(dir, report);
   return dir;
 }

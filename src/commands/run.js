@@ -14,7 +14,7 @@ import { analyzePeerGraph } from '../lib/peers.js';
 import { installCandidate, mountReplayPlugin, headlessRun, writeReplayPatch, patchAdoptionGate } from '../lib/shadow.js';
 import { readIntegrity, writeRound, matchSignatures, extractRoutes, sanitizeStderr, extractHistoryTools, classifyHistory, writeRoundVerdict } from '../lib/drill.js';
 import { decodeAll } from '../lib/zfstd.js';
-import { newReport, addStage, finalize, toMarkdown } from '../lib/report.js';
+import { newReport, addStage, finalize, toMarkdown, writeReport } from '../lib/report.js';
 import { stageTimer } from '../lib/util.js';
 
 export const BOOT_SIGNATURES = [
@@ -382,6 +382,7 @@ export async function cmdRun(opts) {
 }
 
 function write(dir, report) {
-  fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(report, null, 2));
-  fs.writeFileSync(path.join(dir, 'report.md'), toMarkdown(report));
+  // writeReport re-runs finalize() when needed, so a stage that forgets to
+  // finalize cannot publish a report that still claims privacy.scrubbed=true
+  writeReport(dir, report);
 }

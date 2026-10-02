@@ -15,11 +15,15 @@ const pkgVersion = JSON.parse(
  * /home or /Users, a UNC share, a relative --home all pass through). The
  * inventory line only needs to say whether the default location was used, so
  * the path is never composed in the first place.
+ *
+ * `def` must come from the caller's defaultHome(): recomputing it here drifted
+ * (with USERPROFILE and HOME unset, the local expression fell back to a
+ * cwd-relative ".dsh" while defaultHome() used os.homedir()), which would have
+ * labelled the real default as "custom".
  */
-export function homeShape(home) {
+export function homeShape(home, def) {
   if (typeof home !== 'string' || !home) return 'unknown';
-  const def = process.env.DSH_HOME
-    || path.join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
+  if (typeof def !== 'string' || !def) return 'custom';
   const norm = (p) => path.resolve(p).replace(/[\\/]+$/, '');
   try {
     if (norm(home) === norm(def)) return 'default';
@@ -47,7 +51,9 @@ export function newReport({ candidateVersion, profile, command }) {
       note: 'sessions migrated to v4 are REFUSED (not rewritten) by older hosts — downgrade after migration is not possible; rollback relies exclusively on a pre-upgrade snapshot of DSH_HOME',
     },
     privacy: {
-      scrubbed: true,
+      // Set by finalize(), not at construction: a report that never reached
+      // finalize() must not claim it was scrubbed.
+      scrubbed: false,
       // Honest capability statement (audit P1-1): reports never carry message
       // bodies; stderr evidence is filtered to diagnostic lines only, and
       // messages are never read by the tool itself (session bodies are only
@@ -203,9 +209,30 @@ export function finalize(report) {
   // the failure this tool exists to avoid.
   const scanned = JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k !== 'warnings')));
   const leftover = [...new Set(findPathShapes(scanned))];
+  if (!report.privacy) report.privacy = {};
   if (leftover.length) {
     if (!Array.isArray(report.warnings)) report.warnings = [];
     report.warnings.push(`redaction gap: ${leftover.length} path-shaped token(s) survived scrubbing (e.g. ${leftover.slice(0, 3).join(', ')}) — treat this report as unsanitised until scrubText learns the shape`);
+    // "scrubbed" means covered, not "the function ran". A report that failed the
+    // invariant says so, rather than carrying a promise it did not keep.
+    report.privacy.scrubbed = false;
+  } else {
+    report.privacy.scrubbed = true;
   }
   return report;
+}
+
+/**
+ * The only sanctioned way to put a report on disk.
+ *
+ * finalize() is idempotent, so calling it here costs nothing on the normal path
+ * and closes the bypass on the unusual one: a stage that forgets to finalize
+ * cannot write an unscrubbed report that still claims privacy.scrubbed=true.
+ */
+export function writeReport(dir, report) {
+  const done = report?.privacy?.scrubbed === true ? report : finalize(report);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(done, null, 2));
+  fs.writeFileSync(path.join(dir, 'report.md'), toMarkdown(done));
+  return done;
 }

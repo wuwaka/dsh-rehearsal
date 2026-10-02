@@ -37,7 +37,7 @@ Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse 
 Two structural guarantees rather than more regexes:
 
 - **paths are not written in the first place where a path is not the fact**. Fields such as DSH_HOME record a shape (`home=default|custom|unknown`), so no path ever enters the string.
-- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`). A future stage that composes a new path style therefore admits it, instead of quietly publishing the path.
+- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. A future stage that composes an unknown style therefore admits it, instead of quietly publishing the path. `writeReport()` is the only writer, and it finalizes an un-finalized report on the way to disk.
 
 What remains true: this is still best-effort filtering, not a proof. Do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 

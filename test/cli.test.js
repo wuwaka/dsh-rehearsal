@@ -109,6 +109,31 @@ test('a non-standard --home never reaches the report, relative or absolute', (t)
   assert.match(details, /home=(default|custom|unknown);/, 'inventory must describe the home, not print it');
 });
 
+test('check without --candidate says the comparison was not run instead of reporting a clean 0', (t) => {
+  const home = buildFixture(t);
+  const artifacts = path.join(home, 'artifacts');
+  const r = runCli(['check', '--home', home, '--artifacts', artifacts]);
+  assert.equal(r.status, 1, 'an unrun upgrade question must not exit 0');
+  const report = JSON.parse(fs.readFileSync(path.join(artifacts, 'report.json'), 'utf8'));
+  const stage = report.stages.find((s) => s.id === 'b1-peer-graph');
+  assert.equal(stage.verdict, 'warn');
+  assert.match(stage.details, /newly-broken comparison NOT exercised/);
+  assert.ok(report.warnings.some((w) => /unrun comparison/.test(w)), 'the vacuous figure needs a warning beside it');
+});
+
+test('the CLI still works with HOME and USERPROFILE both unset', () => {
+  // a bare container has neither; defaultHome() used to reach path.join(undefined)
+  const env = { ...process.env, PATH: process.env.PATH };
+  delete env.HOME;
+  delete env.USERPROFILE;
+  delete env.DSH_HOME;
+  const r = spawnSync(process.execPath, ['-e', "import('./src/lib/dshhome.js').then(m => console.log(m.defaultHome()))"], {
+    cwd: path.join(import.meta.dirname, '..'), env, encoding: 'utf8', timeout: 60000,
+  });
+  assert.equal(r.status, 0, `defaultHome() threw: ${r.stderr}`);
+  assert.match(r.stdout.trim(), /\.dsh$/, `expected a .dsh path, got ${r.stdout.trim()}`);
+});
+
 test('check distinguishes a candidate that newly breaks peers from one that is already broken', (t) => {
   const home = buildFixture(t);
   const prof = path.join(home, 'profiles', 'web');

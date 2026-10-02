@@ -2,7 +2,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { newReport, addStage, finalize, toMarkdown, scrubText, homeShape } from '../src/lib/report.js';
+import fs from 'node:fs';
+import os from 'node:os';
+import { newReport, addStage, finalize, toMarkdown, scrubText, homeShape, writeReport } from '../src/lib/report.js';
 import { extractRoutes } from '../src/lib/drill.js';
 import path_module from 'node:path';
 
@@ -194,6 +196,32 @@ test('a future stage cannot bypass redaction by composing a path', () => {
   assert.ok(!raw.includes('redaction gap'), 'known shapes are masked, so no warning is needed');
 });
 
+test('privacy.scrubbed is earned at finalize, not promised at construction', () => {
+  const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'check' });
+  assert.equal(r.privacy.scrubbed, false, 'a report that never reached finalize() must not claim it was scrubbed');
+  finalize(r);
+  assert.equal(r.privacy.scrubbed, true);
+});
+
+test('writeReport closes the bypass: an un-finalized report cannot reach disk claiming it was scrubbed', (t) => {
+  const dir = fs.mkdtempSync(path_module.join(os.tmpdir(), 'dsh-write-guard-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'check' });
+  addStage(r, { id: 'a', title: 't', verdict: 'pass', durationMs: 1, details: 'home=/root/.dsh', evidence: [] });
+  // deliberately NO finalize() call - this is the future-stage mistake
+  writeReport(dir, r);
+  const onDisk = JSON.parse(fs.readFileSync(path_module.join(dir, 'report.json'), 'utf8'));
+  assert.equal(onDisk.privacy.scrubbed, true, 'the writer must have finalized');
+  assert.ok(!JSON.stringify(onDisk).includes('/root/'), 'and the path must be gone');
+});
+
+test('homeShape and defaultHome agree on what the default location is', async () => {
+  const { defaultHome } = await import('../src/lib/dshhome.js');
+  const d = defaultHome();
+  assert.equal(homeShape(d, d), 'default', 'homeShape drifted from defaultHome');
+  assert.equal(homeShape('/somewhere/else', d), 'custom');
+});
+
 test('an unknown path shape is surfaced as a warning, not shipped silently', () => {
   const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'run' });
   addStage(r, {
@@ -212,9 +240,9 @@ test('an unknown path shape is surfaced as a warning, not shipped silently', () 
 
 test('homeShape describes a DSH_HOME without ever returning its path', () => {
   const p = path_module;
-  const def = process.env.DSH_HOME || p.join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
-  assert.equal(homeShape(def), 'default');
-  assert.equal(homeShape(def + p.sep), 'default', 'a trailing separator is still the default');
+  const def = process.env.DSH_HOME || p.join(process.env.USERPROFILE || process.env.HOME || os.homedir(), '.dsh');
+  assert.equal(homeShape(def, def), 'default');
+  assert.equal(homeShape(def + p.sep, def), 'default', 'a trailing separator is still the default');
   const BS = String.fromCharCode(92);
   const customHomes = [
     '/srv/users/alice/dsh-home',
@@ -225,10 +253,11 @@ test('homeShape describes a DSH_HOME without ever returning its path', () => {
     'E:' + BS + 'work' + BS + 'zhang' + BS + '.dsh',
   ];
   for (const custom of customHomes) {
-    const out = homeShape(custom);
+    const out = homeShape(custom, def);
     assert.ok(['custom', 'unknown'].includes(out), `must classify ${custom}, got ${out}`);
     assert.ok(!out.includes('/') && !out.includes(BS), 'the returned shape must never contain a path separator');
   }
-  assert.equal(homeShape(''), 'unknown');
-  assert.equal(homeShape(undefined), 'unknown');
+  assert.equal(homeShape('', def), 'unknown');
+  assert.equal(homeShape(undefined, def), 'unknown');
+  assert.equal(homeShape('/whatever', ''), 'custom', 'no reference default given: cannot claim default');
 });

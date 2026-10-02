@@ -44,6 +44,16 @@
   `scrubValue` 原先只清值不清键，以路径作键会整体绕过，现已一并清；`finalize()` 增加不变量，用同一
   检测器复扫完整报告，任何漏网的 path-shaped 文本写入 `warnings[]`（`redaction gap: …`），于是将来新
   阶段拼出新式路径时报告自己承认，而不是安静发布。测试数 70 → 73。
+- `privacy.scrubbed: true` 原先写在 `newReport()` 里，等于**构造时就宣称已脱敏**；而 redaction-gap
+  不变量在 `finalize()` 内部，所以"某阶段绕过 `finalize()`"这一场景并未被覆盖（评审指出，判断正确）。
+  现在该字段由 `finalize()` 依据不变量结果写入：没扫干净就是 `false`。同时新增 `writeReport()`
+  作为唯一落盘入口，未 finalize 的报告会被就地补做，绕不过去。
+- `check` 不带 `--candidate` 时，`0 newly-broken high` 是空转出来的数字却按结果呈现。现在该阶段判
+  `warn`、`details` 写明"comparison NOT exercised"、并写入一条 `warnings[]`，退出码为 `1` 而非 `0`。
+- `defaultHome()` 在 `USERPROFILE` 与 `HOME` 同时缺失时（裸容器）会走到
+  `path.join(undefined, '.dsh')` 抛 `TypeError`；现回退到 `os.homedir()` 再到 `cwd`，不再抛。
+  顺带修掉一处同源漂移：`homeShape()` 自己重算默认位置，与加固后的 `defaultHome()` 得出不同结果，
+  会把真实默认值判成 `custom`；现由调用方传入单一事实源。测试数 73 → 78。
 
 ## [0.2.0] - 2026-10-02
 
