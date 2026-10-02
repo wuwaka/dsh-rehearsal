@@ -2,58 +2,59 @@
 
 # Security policy
 
-This tool is not a security boundary. Two flags perform real actions on the host when
-explicitly enabled; they are listed under [Operator-owned risk](#operator-owned-risk).
-A report describing one of those behaviours as a vulnerability belongs in a normal issue.
+This tool is not a security boundary.
 
-## Guarantees enforced in code
+## Guarantees
 
-Each row below is implemented and covered by a test, so a report that one of them is
-broken is a vulnerability report:
+The properties below are enforced in code and covered by tests. A report that any of them is broken is a vulnerability report.
 
 | Guarantee | Where |
 |---|---|
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
-| Copies of sessions get their recorded `cwd` rewritten into the shadow, and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches a child process; only the stripped names are recorded (`redactedEnvNames`) | `src/lib/util.js:56-75` |
+| Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
+| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:56-75` |
 | Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:75` |
-| Reports contain no message bodies and no user paths: `stderr` is filtered to diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:136`, plus a test that greps the finished report for home paths and reasoning markers |
+| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:136`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
-| The shadow home, which holds plaintext session copies, is deleted on every exit path, and the outcome is recorded as `shadowCleanup` | `src/commands/run.js` |
+| The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
 
-## Operator-owned risk
+## Explicitly dangerous options
 
-1. `--allow-tools` executes the tool calls recorded in session history. The sandboxed
-   `cwd` still applies, but `pwsh`, `bash` or any absolute path can leave that directory.
-   The flag exists because suppressing every tool would make the write round vacuous; it
-   is opt-in and prints a banner before running.
-2. `--keep` leaves plaintext copies of sessions in the shadow home and the install prefix
-   for debugging. It should not be used on an unmanaged machine, and the output should be
-   removed afterwards (`dsh-rehearsal clean --yes`).
+**`--allow-tools` is not a sandbox capability. It is an explicit request to execute recorded tool calls.**
 
-Related, but a scope limit rather than a risk: candidate installs default to
-`--ignore-scripts`, matching the short build-script list the official pnpm setup
-whitelists. `--run-scripts` executes third-party lifecycle scripts.
+| Flag | Consequence |
+|---|---|
+| `--allow-tools` | Executes the tool calls recorded in session history. The sandboxed `cwd` still applies, but `pwsh`, `bash` or any absolute path can leave that directory. A banner is printed before execution |
+| `--keep` | Leaves plaintext session copies in the shadow home and the install prefix. Do not use it on an unmanaged machine; remove the output afterwards with `dsh-rehearsal clean --yes` |
+| `--run-scripts` | Lets the candidate install run third-party lifecycle scripts. The default is `--ignore-scripts`, matching the short build-script list the official pnpm setup whitelists |
+
+## Reports are sensitive data
+
+`report.json` and `report.md` derive from local session data. Redaction is a filter, not a proof: do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
 ## Out of scope
 
-- Not a sandbox against a hostile candidate `dsh`. A rehearsal runs a build of the harness
-  under evaluation; file-level precautions do not apply to a malicious build.
-- Not a defence against installed plugins. A rehearsal loads the pinned plugin set, so a
-  plugin that exfiltrates data does so during the rehearsal as well.
-- Attachment side data (`~/.dsh/attachments`, `cache/attachments`) is neither copied nor
-  verified; attachment-reference integrity is declared out of scope rather than assumed
-  covered.
-- Scrubbing is a filter, not a proof. Real message content or a real user path appearing in
-  a report is a defect worth reporting, and report files should be treated as sensitive
-  regardless.
+- Not a sandbox against a hostile candidate `dsh`. A rehearsal runs a build of the harness under evaluation; file-level precautions do not apply to a malicious build.
+- Not a defence against installed plugins. A rehearsal loads the pinned plugin set, so a plugin that exfiltrates data does so during the rehearsal as well.
+- Attachment side data (`~/.dsh/attachments`, `cache/attachments`) is neither copied nor verified; attachment-reference integrity is declared out of scope.
+
+## Verifying that the real home was not touched
+
+Three independent checks:
+
+```sh
+# 1) every migration artifact in the real library must predate the rehearsal
+find ~/.dsh/sessions -name 'session.v4.jsonl.zstd' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -3
+# 2) no shadow directory is left behind (unless --keep or --shadow-dir was used)
+ls -d "${TMPDIR:-/tmp}"/dsh-rehearsal-home-* 2>/dev/null | wc -l
+# 3) the report contains neither a home path nor message bodies; replace <TOKENS> with the reader's own username and drive keywords
+node -e "const fs=require('fs');const d=fs.readdirSync('.dsh-rehearsal').sort().pop();\
+const t=fs.readFileSync('.dsh-rehearsal/'+d+'/report.json','utf8');\
+console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CLEAN')"
+```
+
+The tokens in check 3 are filled in by the reader on purpose: a documented grep that hard-codes the keywords would match the document itself.
 
 ## Reporting
 
-Use a [private security advisory](https://github.com/wuwaka/dsh-rehearsal/security/advisories/new).
-Include the candidate `dsh` version, OS, Node version, and the tool version
-(`dsh-rehearsal --version`).
-
-Report files and `run` output should not be pasted into a public issue: scrubbing is
-best-effort, and those files derive from local session history. `report.json` and
-`report.md` stay on disk; this tool uploads nothing.
+Open a [private security advisory](https://github.com/wuwaka/dsh-rehearsal/security/advisories/new) with the candidate `dsh` version, OS, Node version, and tool version (`dsh-rehearsal --version`).

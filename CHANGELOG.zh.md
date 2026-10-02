@@ -2,26 +2,32 @@
 
 [简体中文](CHANGELOG.zh.md) | [English](CHANGELOG.md)
 
-格式：[Keep a Changelog](https://keepachangelog.com/zh-Hans/1.1.0/)，版本号遵循
-[语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。英文版为
-[CHANGELOG.md](CHANGELOG.md)，两份文件的小节必须一一对应：`test/changelog.test.js` 断言该一致性，
-`.github/workflows/release.yml` 在缺任一份时终止发布。
+> 下面的版本号属于 `dsh-rehearsal`。`run --to <版本>` 中的版本是候选 `dsh`，不作为发布版本记录。
 
-命名区分：本文件的版本号属于 `dsh-rehearsal`；`run --to <版本>` 中的版本属于被测 `dsh`，不记录在此。
+格式：[Keep a Changelog](https://keepachangelog.com/zh-Hans/1.1.0/)，[语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
+两份文件的小节同名同序（`test/changelog.test.js`），任一份缺少对应小节时 `release.yml` 终止发布。
 
 ## [Unreleased]
 
 ### 变更
 
-- 全部文档改为陈述式技术文体：第一人称清零，破折号与加粗密度减半，警句换成机制与出处。
-- 新增仓库海报 `assets/poster.jpg`（1774×887），按 `dsh-clipboard-menu` 的体例嵌入两份 README 顶部。
-
-### 新增
-
-- 每份文档都成为双语对：`SECURITY`、`PUBLISHING`、`docs/FAILURE_MODES`、`AUDIT`、`FIXES` 补齐另一半。
-- `test/docs.test.js`：断言对开存在、小节数一致、`file:line` 引用集合一致、issue 号与提交哈希集合一致、
-  语言切换行指向真实文件、且没有文档退回第一人称（测试数 61 → 68）。
-- `assets/social-preview.jpg`（1280×640）供仓库社交预览图手动上传使用，步骤记录在 `PUBLISHING.md`。
+- README 从 247 行压到约 130 行：只保留定位、安装、快速开始、真实输出示例、报告、覆盖范围、
+  安全摘要、兼容性、限制。移出的内容进入新增的 `docs/architecture.md`。
+- 首页不再承担"为什么值得存在"的论证：外部 CLI 的理由、与同类工具的分工表、写回合三层抑制的
+  实现细节、多帧 zstd 的测量数字，全部下沉到 architecture 与 SECURITY。
+- 新增一句核心边界：**迁移成功不等于迁移后的会话还能写回**。
+- "全程无需 API 键"改为准确表述：写回合走 `@deepseek-ai/dsh-llm-replay` 的录制回放路径，
+  不发起真实模型请求。
+- 术语统一：预检 / 预演 / 迁移 / 写回（pre-flight / rehearsal / migration / write round）；
+  状态词统一为 Tested / Inferred / Not tested / Unsupported / Not covered。
+- 删除"由报告自证""逐条核对对方源码"这类审计腔措辞。
+- `SECURITY.md` 重排为：代码保证 / 显式危险选项 / 报告是敏感数据 / 范围之外 / 自查方法 / 上报方式。
+- `AUDIT.md` 标注为历史基线文档（基线 `7c374bc`），新增逐条状态总览表；`FIXES.md` 并入其
+  "修复与验证"一节后删除，避免与 AUDIT / CHANGELOG / git 历史三处重复。
+- `PUBLISHING.md` 改为清单优先，事故叙述移出。
+- 全部文档双语对；`test/docs.test.js` 断言对开存在、小节数一致、`file:line` 引用与 issue 号与
+  提交哈希集合一致、语言切换行指向真实文件、无第一人称（测试数 61 → 68）。
+- 新增仓库海报 `assets/poster.jpg` 与 `assets/social-preview.jpg`。
 
 ## [0.2.0] - 2026-10-02
 

@@ -2,35 +2,28 @@
 
 [简体中文](CHANGELOG.zh.md) | [English](CHANGELOG.md)
 
-Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning:
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+> Version numbers below refer to `dsh-rehearsal`. The `dsh` version passed to `run --to` is the
+> candidate runtime and is not recorded here as a release version.
 
-One naming note, because it is easy to confuse: the version below is
-**`dsh-rehearsal`'s own**. `run --to <version>` rehearses *someone else's*
-version — the candidate `dsh` — and that number is never recorded here.
-
-中文对应版本见 [CHANGELOG.zh.md](CHANGELOG.zh.md)。两份文件的小节必须一一对应 ——
-`test/changelog.test.js` 断言这件事，`.github/workflows/release.yml` 在缺任一份时拒绝发布。
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Both files list the same sections in the same order (`test/changelog.test.js`), and `release.yml`
+refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
 ### Changed
 
-- All documentation moved to an impersonal technical register: first person removed, em-dash and
-  bold density roughly halved, aphorisms replaced by mechanism plus citation.
-- Repository poster `assets/poster.jpg` (1774×887) added at the top of both READMEs, following the
-  `dsh-clipboard-menu` convention.
-
-### Added
-
-- Every document now exists as a bilingual pair: `SECURITY`, `PUBLISHING`,
-  `docs/FAILURE_MODES`, `AUDIT` and `FIXES` gained their missing half.
-- `test/docs.test.js`: asserts each pair exists, that section counts agree, that the `file:line`
-  citation sets match, that issue numbers and commit hashes match, that language switch lines
-  resolve to real files, and that no document drifts back into first-person prose
-  (test count 61 → 68).
-- `assets/social-preview.jpg` (1280×640) for the repository social preview image; the manual upload
-  step is documented in `PUBLISHING.md`.
+- The README was cut from 247 lines to roughly 130, keeping only positioning, install, quick start, a real output sample, reports, coverage, a safety summary, compatibility and limitations. Everything moved out went into the new `docs/architecture.md`.
+- The front page no longer argues for its own existence: the external-CLI rationale, the comparable-tools table, the three-layer write-round internals and the multi-frame zstd measurements now live in the architecture and security documents.
+- Added the boundary the whole tool turns on: **a successful migration does not prove the migrated session can still be written to**.
+- "No API key required" was made precise: the write round replays through `@deepseek-ai/dsh-llm-replay` and issues no live model request.
+- Terminology unified (pre-flight / rehearsal / migration / write round); status vocabulary fixed to Tested / Inferred / Not tested / Unsupported / Not covered.
+- Removed audit-voice phrasing such as "self-evidenced by the report" and "verified line by line against their source".
+- `SECURITY.md` restructured into: guarantees, explicitly dangerous options, reports are sensitive data, out of scope, self-check procedure, reporting.
+- `AUDIT.md` is now marked as a historical baseline document (baseline `7c374bc`) with a per-finding status overview; `FIXES.md` was folded into it as a remediation section and deleted, removing the overlap with AUDIT, this changelog and git history.
+- `PUBLISHING.md` became a checklist first, with the incident narrative moved out.
+- Every document is a bilingual pair. `test/docs.test.js` asserts the pair exists, section counts match, `file:line` citations, issue numbers and commit hashes agree, language switch lines resolve, and no document drifts back into first person (test count 61 → 68).
+- Added repository images `assets/poster.jpg` and `assets/social-preview.jpg`.
 
 ## [0.2.0] - 2026-10-02
 

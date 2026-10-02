@@ -1,20 +1,24 @@
-[简体中文](FAILURE_MODES.md) | [English](FAILURE_MODES.en.md)
-
 # Failure signatures
 
-This file lists every log pattern the `run` command recognizes, with its detection site and
-its origin: an upstream issue number where one exists, otherwise a `file:line` in this
-repository.
+[简体中文](FAILURE_MODES.md) | [English](FAILURE_MODES.en.md)
 
-Why the list exists: the dominant risk for a tool that outputs an upgrade decision is not a
-crash but describing something as verified when it was never exercised. Each entry therefore
-states three things — what a hit means, what a non-hit does not prove, and whether it can be
-reproduced on this machine.
+`run` classifies a set of known log patterns and artifact conditions. Each signature records four things:
 
-Comparable tools usually write limitations as prose. The one that structures signatures and
-locks them with regression tests is `sweetory1320/dsh-plugin-lab` (`references/failure-modes.md`
-and `src/signatures.js`, locked against real crash logs). As of 2026-10-02, no project in this
-ecosystem keys failure signatures to upstream issue numbers.
+- where it is detected;
+- what a hit means;
+- what a non-hit does not prove;
+- whether it has been reproduced on this machine.
+
+A signature is evidence, not a diagnosis by itself. Origins are anchored to an upstream issue number where one exists, and to a `file:line` in this repository otherwise.
+
+## Verdict semantics
+
+- **`pass`** — the tested property was observed.
+- **`fail`** — the tested property was violated.
+- **`inconclusive`** — the rehearsal did not exercise the path far enough to decide. Neither a pass nor a failure.
+
+One string, `MISSING_CREDENTIAL`, means opposite things in two stages (see section 3). That is why verdicts derive from artifacts and never from exit codes.
+
 
 ---
 

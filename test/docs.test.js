@@ -14,7 +14,7 @@ const PAIRS = [
   ['SECURITY.md', 'SECURITY.en.md'],
   ['PUBLISHING.md', 'PUBLISHING.en.md'],
   ['AUDIT.md', 'AUDIT.en.md'],
-  ['FIXES.md', 'FIXES.en.md'],
+  [path.join('docs', 'architecture.md'), path.join('docs', 'architecture.en.md')],
   [path.join('docs', 'FAILURE_MODES.md'), path.join('docs', 'FAILURE_MODES.en.md')],
 ];
 
@@ -85,12 +85,12 @@ test('pairs cite the same commit hashes', () => {
 test('no document regressed into first-person prose', () => {
   // zero tolerance on 我: quoting a third party who spoke in the first person would
   // need an explicit exception here rather than a silent relaxation of the rule
-  const zh = ['README.md', 'SECURITY.md', 'PUBLISHING.md', 'CHANGELOG.zh.md', 'AUDIT.md', 'FIXES.md', path.join('docs', 'FAILURE_MODES.md')];
+  const zh = ['README.md', 'SECURITY.md', 'PUBLISHING.md', 'CHANGELOG.zh.md', 'AUDIT.md', path.join('docs', 'FAILURE_MODES.md'), path.join('docs', 'architecture.md')];
   for (const f of zh) {
     const hits = read(f).split(/\r?\n/).filter((l) => /我/.test(l));
     assert.deepEqual(hits, [], `${f} contains first-person narration`);
   }
-  const en = ['README.en.md', 'SECURITY.en.md', 'PUBLISHING.en.md', 'CHANGELOG.md', 'AUDIT.en.md', 'FIXES.en.md', path.join('docs', 'FAILURE_MODES.en.md')];
+  const en = ['README.en.md', 'SECURITY.en.md', 'PUBLISHING.en.md', 'CHANGELOG.md', 'AUDIT.en.md', path.join('docs', 'FAILURE_MODES.en.md'), path.join('docs', 'architecture.en.md')];
   for (const f of en) {
     // case-sensitive: /\bi\b/i would fire on "i.e." and flag prose that has no actor
     assert.equal(/\bI\b|\b(we|our|us)\b/.test(read(f)), false, `${f} contains first-person narration`);

@@ -1,151 +1,64 @@
 [简体中文](PUBLISHING.md) | [English](PUBLISHING.en.md)
 
-# 发布检查清单
+# 发布清单
 
-首次 `git push` 之前读一遍，每次发版前再读一遍。
+## 发布前
 
-## 历史中含脱敏前的快照
+- [ ] `npm test` 全绿
+- [ ] 工作树干净，`git status` 无意外文件
+- [ ] `.dsh-rehearsal/`、`*.tgz`、`SHA256SUMS.txt` 未被跟踪（`.gitignore` 已覆盖）
+- [ ] 跟踪文件中无凭据、无本机路径：`git grep -nE "<TOKENS>"`（token 由使用方自己填，写进文档的那条命令会在文档自身命中）
+- [ ] README 与两份 CHANGELOG 已更新
 
-工作树与 `HEAD` 是干净的：全树 `git grep` 对用户路径返回 0 命中，脱敏测试负责维持这一点。
+## 版本
 
-提交不可变，本地历史里仍有一个脱敏**之前**的快照：该提交在 5 个文件（`README.md`、
-`AUDIT.md`、`src/lib/sessions.js`、`test/report.test.js`、`test/sessions.test.js`）中留有
-13 处真实路径；更早的两个提交各含 2 处（`test/report.test.js` 里的合成夹具用户名）。
+- [ ] `package.json` 的 `version` = `X.Y.Z`
+- [ ] `CHANGELOG.md` 与 `CHANGELOG.zh.md` 各新增 `## [X.Y.Z] - YYYY-MM-DD` 小节，内容对应、顺序一致
+- [ ] 两份 changelog 底部的 `[X.Y.Z]` 链接与 `[Unreleased]` compare 区间已更新
 
-`git push` 推的是历史而不只是末端。因此用一个独立的干净分支发布，不要改写审计轨迹：
+`test/changelog.test.js` 断言：两份版本小节同名同序、每个发布小节带日期、最新小节号等于 `package.json` 版本。
 
-```sh
-git checkout --orphan publish-clean
-git add -A
-git commit -m "dsh-rehearsal: static upgrade pre-flight + keyless session rehearsal"
-
-# 校验后，把这个干净的树推成公开默认分支
-git diff --stat main publish-clean          # 必须无输出（两棵树一致）
-git ls-tree -r --name-only publish-clean    # 不含 .dsh-rehearsal/、node_modules/、夹具
-git grep -nE "<TOKENS>" publish-clean --    # 用阅读者自己的用户名/盘符关键词；预期无输出
-npm test                                    # 必须全绿
-git remote add origin https://github.com/<you>/dsh-rehearsal.git
-git push origin publish-clean:main
-```
-
-`main` 有意保留完整历史：它是审计轨迹，记录在 `AUDIT.md` 与 `FIXES.md`，且没有 upstream，
-因此不会被误推。
-
-### 同步 publish-clean
-
-`git checkout main -- .` **不会删除** `main` 上已删除的文件；曾经有一个被废弃的脚本因此
-进入公开树。拷贝之后需显式删除 `main` 已不再包含的文件，并把"两棵树一致"作为推送前的闸门：
+## 打 tag 与推送
 
 ```sh
-git checkout -q publish-clean && git checkout main -- . && git add -A
-git diff --stat main publish-clean          # 必须无输出
-[ -z "$(git diff main publish-clean)" ] && echo "GATE OK" || echo "GATE FAIL: 不要推送"
-```
-
-## 产物永不入库
-
-`.gitignore` 排除了 `.dsh-rehearsal/`，报告和预演输出都落在那里。报告已脱敏，但其中含有
-本机的会话 id 与直方图形状，不应入库。`*.tgz` 与 `SHA256SUMS.txt` 同样被忽略：入库的校验
-和会与 tag 实际指向的 tarball 失去对应关系。
-
-## 切一个 release
-
-`release.yml` 由 `v*` tag 推送触发，有两种情况会直接终止，因此顺序很重要：
-
-```sh
-npm test                                     # 必须全绿
-# 1. 两份 CHANGELOG 都要改：CHANGELOG.md（英文）与 CHANGELOG.zh.md（中文）。
-#    把 Unreleased 内容移入新的 "## [X.Y.Z] - YYYY-MM-DD" 小节（版本号与顺序保持一致，
-#    test/changelog.test.js 断言成对），在文件底部加 [X.Y.Z] 链接，并更新 [Unreleased] 的 compare 区间。
-# 2. package.json 的 "version" 必须精确等于 X.Y.Z，且在同一个提交里。
-node scripts/release-notes.mjs vX.Y.Z        # 输出的就是 Release 正文
+npm test
+node scripts/release-notes.mjs vX.Y.Z     # 输出的就是 Release 正文
 git add -A && git commit -m "…"
 git tag -a "vX.Y.Z" -m "vX.Y.Z"
-git push origin publish-clean:main           # 先让 CI 变绿
-git push origin "vX.Y.Z"                     # 触发 Release job —— 这是对外可见动作
+git push origin publish-clean:main        # 先等 CI 绿
+git push origin "vX.Y.Z"                  # 触发 Release job，这是对外可见动作
 ```
 
-Release 正文由 tag 所在提交生成，中英双语并按固定顺序排列：中文（新增/修复/变更）→ 安装 →
-`---` → 英文对应小节。任一份 changelog 缺少对应小节都会让任务失败，因此正文不可能事后凭记忆补写。
+`release.yml` 有两种情况直接终止：tag 与 `package.json` 版本不一致；任一份 changelog 缺对应小节。含 `-` 的 tag 自动标记 `--prerelease`，此时 `publish.yml` 仍会尝试 npm 发布，若不希望占据 `latest` dist-tag 需传 `--tag next`。
 
-要重建一个已发布 tag 的正文或附件，使用 **Run workflow → `release.yml` → tag**，不要移动公开
-tag：该 job 会检出 tag 本身，因此即便 `main` 上这份文件更新，`package.json` 与 changelog 仍取自
-被 tag 的提交。
+要重建已发布 tag 的正文或附件，用 **Run workflow → `release.yml` → tag**，不要移动公开 tag：该 job 检出 tag 本身，`package.json` 与 changelog 仍取自被 tag 的提交。
 
-随后验证 release 确实带有它声称的东西：
+## 验证 release
 
 ```sh
 gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
   --json tagName,isDraft,isPrerelease,assets --jq '{tagName,isDraft,isPrerelease,assets:[.assets[].name]}'
-# 预期：draft=false、isPrerelease=false（tag 含 `-` 时为 true），
-#       assets = dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
 ```
 
-含 `-` 的 tag（例如 `v0.3.0-rc.1`）会自动标记 `--prerelease`，`publish.yml` 仍会尝试 npm
-发布；若预发布不应占据 `latest` dist-tag，需传 `--tag next`。
+- [ ] `draft=false`，`isPrerelease` 与 tag 形态一致
+- [ ] 附件为 `dsh-rehearsal-X.Y.Z.tgz` 与 `.tgz.sha256`
+- [ ] 下载后 `sha256sum -c` 通过
+- [ ] `npm install -g github:<you>/dsh-rehearsal#vX.Y.Z` 与 tarball 两条安装路径都能装出可执行的 bin
 
 ## 仓库公开之后
 
-1. **由 CI 发布到 npm。** `.github/workflows/publish.yml` 在 `release: published` 上运行，
-   重新测试、把打包件装进临时前缀跑一遍可执行文件，然后 `npm publish --provenance`。缺少
-   `NPM_TOKEN` 时它跳过而不是失败，因此没有该 secret 的仓库不会出现红色流水线：
+- [ ] **npm 发布**：设置 `NPM_TOKEN` 后 `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z`。缺少该 secret 时任务跳过而不是报错。
+      本机 `~/.npmrc` 默认 registry 是只读镜像，对 `npm whoami` 返回 404 且不接受发布，因此发布走 CI，或显式加 `--registry https://registry.npmjs.org`。
+- [ ] **topics**：`gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`。`dsh-plugin` 只作为检索入口，本仓库刻意不是 `dsh plugin add` 的 bundle。
+- [ ] **不要向 `awesome-dsh-plugin` 目录投稿**：其 `scripts/check-submission.mjs:258-264` 要求某个 `package.json` 声明 `dsh.bundle`，只声明 `dsh.client` 亦被拒。同为外部 CLI 的 `dsh-plugin-reducer`、`dsh-canary` 在该目录 4,412 条中 0 命中。适合的位置是工具类目录：`walkinglabs/awesome-deepseek-harness-plugins` 的 `docs/INCLUSION_POLICY.md` 第 4 条，以及 `awesome-deepseekharness/awesome-deepseek-harness` 的 `CONTRIBUTING.md`（🧩 Tools）。两处截至 2026-10-03 均未提交。
+- [ ] 有收录之后再加注册表徽章；`dsh-doctor` 的门禁徽章不适用（其 R/K/D 门评分 `dsh.bundle` 包）。
+- [ ] `gh run list --repo <you>/dsh-rehearsal` 确认 CI 徽章可解析。
 
-   ```sh
-   gh secret set NPM_TOKEN --repo <you>/dsh-rehearsal --body "<granular access token, Publish scope>"
-   gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z
-   ```
+## 图片与社交预览
 
-   也可以从本机发布，但这台机器上有个陷阱：`~/.npmrc` 的默认 `registry` 是
-   `registry.npmmirror.com`，一个只读镜像，对 `npm whoami` 返回 404 且不接受发布。要么用 CI，
-   要么显式同时传入覆盖项：
-
-   ```sh
-   npm publish --registry https://registry.npmjs.org   # 需要该 registry 的 auth token
-   ```
-
-   2026-10-02 时 `dsh-rehearsal` 这个包名仍无人占用（registry 404）。社区有占名不发布的习惯，
-   因此确认可发布时再占。
-2. **设置 topics。** `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`
-   （topics 需要 `repo` scope）。`dsh-plugin` 只能作为检索入口添加：本仓库刻意不是
-   `dsh plugin add` 的 bundle，README 头部已写明。不要让 topic 变成安装声明。
-
-3. **不要向 `awesome-dsh-plugin/awesome-dsh-plugin` 投稿。** 2026-10-02 核实：其
-   `scripts/check-submission.mjs:258-264` 要求仓库内某个 `package.json` 声明 `dsh.bundle`，
-   只声明 `dsh.client` 会被以"that alone is not installable"拒绝。与本仓库同为外部 CLI 的
-   `dsh-plugin-reducer` 与 `dsh-canary` 在其生成列表中同样 0 命中（4,412 条）。投稿会消耗一个
-   CI 门槛的 PR，并因一条正确的规则被拒：出现在那里意味着本工具刻意不具备的可安装性。
-
-   描述文件的键是白名单（`scripts/lib/entries.mjs:136`：`url, name, category, description,
-   tarball, file`，未知键直接 CI 失败），可选的 `tarball` 必须是 https、GitHub Release 托管、
-   以 `.tgz` 结尾 —— `release.yml` 附上的正是这个形状。
-
-   适合收录的位置：
-   - `walkinglabs/awesome-deepseek-harness-plugins` → `docs/INCLUSION_POLICY.md` 第 4 条：
-     "It is a client, launcher, or development resource … placed outside the plugin categories
-     and labelled accordingly."
-   - `awesome-deepseekharness/awesome-deepseek-harness` → `CONTRIBUTING.md`，类别
-     `🧩 Tools, Workflows & Presets`；该列表要求在同一位置同时插入 `README.md`（英文）与
-     `README.zh.md`（中文）条目，示例 PR 标题为 `Add owner/repo to Category`。
-
-   截至 2026-10-03，两处均未提交。
-
-4. **有收录之后再加注册表徽章**（npm version/downloads、dshfind、marketplace）。提前添加的
-   徽章会 404。`dsh-doctor` 的门禁徽章不适用：它的 R/K/D 门评分对象是 `dsh.bundle` 包，
-   本仓库不声明该字段。
-5. 首个 workflow 跑绿后，复核 README 头部的 CI 徽章可解析：`gh run list --repo <you>/dsh-rehearsal`。
-
-## 仓库图片与社交预览
-
-- `assets/poster.jpg`（1774×887，233 KB）是两份 README 顶部居中的海报，写法沿用
-  `wuwaka/dsh-clipboard-menu` 的体例：`<div align="center">` 内第一行
-  `<img src="assets/poster.jpg" width="620" alt="…">`，alt 文本写成一句可核对的描述。
-  邻居 `dsh-plugin-gating-hub` 用 `width="1170"`（占满内容宽度）；620 之下海报上的
-  两行中文副标题偏小，需要放大时改这一个数字即可。
-- `assets/social-preview.jpg`（1280×640，153 KB）用于仓库的**社交预览图**：在
-  Settings → General → Social preview 手动上传。这一步没有接口可做——2026-10-03 核过
-  REST 的 repo 对象里没有任何 social preview 字段。它决定仓库链接被分享/展开时显示的图，
-  不影响 GitHub 搜索结果列表本身。
-- 两个文件都从同一张原始海报再生（源图不入库，1.88 MB）：
+- `assets/poster.jpg`（1774×887，233 KB）是两份 README 顶部的海报，写法沿用 `wuwaka/dsh-clipboard-menu`：`<div align="center">` 内第一行 `<img src="assets/poster.jpg" width="620" alt="…">`，alt 写成一句可核对的描述。邻居 `dsh-plugin-gating-hub` 用 `width="1170"`；620 之下海报上的中文副标题偏小，要放大改这一个数字。
+- `assets/social-preview.jpg`（1280×640，153 KB）用于仓库社交预览图，在 Settings → General → Social preview 手动上传。这一步没有接口：2026-10-03 核过 REST 的 repo 对象没有 social preview 字段。它决定仓库链接被分享或展开时显示的图，不影响 GitHub 搜索结果列表。
+- 两个文件从同一张源图再生（源图 1.88 MB，不入库）：
 
   ```sh
   python - <<'PY'
@@ -157,21 +70,22 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
   PY
   ```
 
-- 相对路径图片在 npm 的包页面通常解析不了，因此海报预期只在 GitHub 生效。此点尚未实测
-  （包还没发布），发布后需要复核。
+- 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。此点未实测（包尚未发布），发布后需复核。
 
-## 容易被破坏的文档约束
+## 干净分支与历史
 
-- 所有文档均为双语对：`README.md` / `README.en.md`、`CHANGELOG.zh.md` / `CHANGELOG.md`、
-  `SECURITY.md` / `SECURITY.en.md`、`PUBLISHING.md` / `PUBLISHING.en.md`、
-  `docs/FAILURE_MODES.md` / `docs/FAILURE_MODES.en.md`。`test/docs.test.js` 会在缺失对开文件、
-  两份的 `## ` 标题数不一致、语言切换行指向不存在的文件、或某条 `file:line` 引用只出现在
-  一半时失败。
-- 行文为陈述式且无第一人称：主张与出处相邻，不以警句替代机制，破折号克制，加粗只用于标识符
-  与严重级别。用 `grep -c` 统计第一人称标记与 `——` 数量来验证，而不是靠目测。
-- 有三处结论依赖测量，且会自行过期：
-  - **兼容性表**分列实测与声明并写明验证日期，每次发版重测；
-  - **覆盖率表**（可预演占比、通过允许清单占比）来自单机测量，重新发布要重新测，
-    不要跨用户取平均或表述为普遍水平；
-  - **同类对比表**描述的是别人的仓库，对方会不通知就变更。重复任何一格前先重读对方源码：
-    对同类项目做出错误描述，正是这一节要避免的失败模式。
+公开 `main` 由 `publish-clean` 推送，本地 `main` 是审计轨迹（记录在 `AUDIT.md`），没有 upstream，因此不会被误推。原因是本地历史含一个脱敏之前的快照，`git push` 推的是历史而不只是末端。
+
+同步公开树时注意：`git checkout main -- .` **不会删除** `main` 上已删除的文件，曾因此把一个废弃脚本推上公开面。推送前必须过这道闸门：
+
+```sh
+git checkout -q publish-clean && git checkout main -- . && git add -A
+git commit -m "Sync clean tree: …"
+[ -z "$(git diff main publish-clean)" ] && echo "GATE OK" || echo "GATE FAIL: 不要推送"
+```
+
+## 文档约束
+
+- 每份文档都是双语对：`README`、`CHANGELOG`、`SECURITY`、`PUBLISHING`、`AUDIT`、`docs/architecture`、`docs/FAILURE_MODES`。`test/docs.test.js` 在对开缺失、`## ` 小节数不一致、`file:line` 引用集合不同、issue 号或提交哈希不同、语言切换行指向不存在的文件、或文档退回第一人称时失败。
+- 行文为陈述式且无第一人称，主张与出处相邻。用 `grep -c` 统计第一人称标记与 `——` 数量来验证，不靠目测。
+- 三处结论依赖测量，会自行过期：兼容性表（分列 Tested 与声明，注明日期，每次发版重测）、覆盖率表（单机数字，重新发布要重测，不跨用户取平均）、`docs/architecture.md` 里的同类工具分工表（描述的是别人的仓库，重复任何一格前先重读对方源码）。
