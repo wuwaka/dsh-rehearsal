@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/poster.jpg" width="620" alt="dsh-rehearsal poster: rehearsing a DeepSeek Harness upgrade against real session history in an isolated DSH_HOME">
+
 # dsh-rehearsal
 
 Upgrade rehearsal tool for DeepSeek Harness (`dsh`): loads your plugin set and copies of your real sessions against a candidate version in a fresh `DSH_HOME`, requires no API key, and produces a verifiable upgrade decision report.

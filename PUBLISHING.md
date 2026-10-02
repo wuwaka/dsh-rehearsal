@@ -134,6 +134,32 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
    本仓库不声明该字段。
 5. 首个 workflow 跑绿后，复核 README 头部的 CI 徽章可解析：`gh run list --repo <you>/dsh-rehearsal`。
 
+## 仓库图片与社交预览
+
+- `assets/poster.jpg`（1774×887，233 KB）是两份 README 顶部居中的海报，写法沿用
+  `wuwaka/dsh-clipboard-menu` 的体例：`<div align="center">` 内第一行
+  `<img src="assets/poster.jpg" width="620" alt="…">`，alt 文本写成一句可核对的描述。
+  邻居 `dsh-plugin-gating-hub` 用 `width="1170"`（占满内容宽度）；620 之下海报上的
+  两行中文副标题偏小，需要放大时改这一个数字即可。
+- `assets/social-preview.jpg`（1280×640，153 KB）用于仓库的**社交预览图**：在
+  Settings → General → Social preview 手动上传。这一步没有接口可做——2026-10-03 核过
+  REST 的 repo 对象里没有任何 social preview 字段。它决定仓库链接被分享/展开时显示的图，
+  不影响 GitHub 搜索结果列表本身。
+- 两个文件都从同一张原始海报再生（源图不入库，1.88 MB）：
+
+  ```sh
+  python - <<'PY'
+  from PIL import Image
+  src = Image.open('poster-source.png').convert('RGB')          # 1774x887, 2:1
+  src.save('assets/poster.jpg', quality=88, optimize=True, progressive=True)
+  src.resize((1280, 640), Image.LANCZOS).save(
+      'assets/social-preview.jpg', quality=90, optimize=True, progressive=True)
+  PY
+  ```
+
+- 相对路径图片在 npm 的包页面通常解析不了，因此海报预期只在 GitHub 生效。此点尚未实测
+  （包还没发布），发布后需要复核。
+
 ## 容易被破坏的文档约束
 
 - 所有文档均为双语对：`README.md` / `README.en.md`、`CHANGELOG.zh.md` / `CHANGELOG.md`、

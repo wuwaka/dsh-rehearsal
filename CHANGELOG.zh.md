@@ -11,7 +11,17 @@
 
 ## [Unreleased]
 
-暂无。
+### 变更
+
+- 全部文档改为陈述式技术文体：第一人称清零，破折号与加粗密度减半，警句换成机制与出处。
+- 新增仓库海报 `assets/poster.jpg`（1774×887），按 `dsh-clipboard-menu` 的体例嵌入两份 README 顶部。
+
+### 新增
+
+- 每份文档都成为双语对：`SECURITY`、`PUBLISHING`、`docs/FAILURE_MODES`、`AUDIT`、`FIXES` 补齐另一半。
+- `test/docs.test.js`：断言对开存在、小节数一致、`file:line` 引用集合一致、issue 号与提交哈希集合一致、
+  语言切换行指向真实文件、且没有文档退回第一人称（测试数 61 → 68）。
+- `assets/social-preview.jpg`（1280×640）供仓库社交预览图手动上传使用，步骤记录在 `PUBLISHING.md`。
 
 ## [0.2.0] - 2026-10-02
 

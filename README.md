@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/poster.jpg" width="620" alt="dsh-rehearsal 海报：在隔离 DSH_HOME 中用真实历史会话预演 DeepSeek Harness 升级">
+
 # dsh-rehearsal
 
 DeepSeek Harness（`dsh`）升级预演工具：在全新的 `DSH_HOME` 中用候选版本加载插件集与真实会话副本，全程无需 API 键，输出可核验的升级决策报告。

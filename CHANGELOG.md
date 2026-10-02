@@ -14,7 +14,23 @@ version — the candidate `dsh` — and that number is never recorded here.
 
 ## [Unreleased]
 
-Nothing pending.
+### Changed
+
+- All documentation moved to an impersonal technical register: first person removed, em-dash and
+  bold density roughly halved, aphorisms replaced by mechanism plus citation.
+- Repository poster `assets/poster.jpg` (1774×887) added at the top of both READMEs, following the
+  `dsh-clipboard-menu` convention.
+
+### Added
+
+- Every document now exists as a bilingual pair: `SECURITY`, `PUBLISHING`,
+  `docs/FAILURE_MODES`, `AUDIT` and `FIXES` gained their missing half.
+- `test/docs.test.js`: asserts each pair exists, that section counts agree, that the `file:line`
+  citation sets match, that issue numbers and commit hashes match, that language switch lines
+  resolve to real files, and that no document drifts back into first-person prose
+  (test count 61 → 68).
+- `assets/social-preview.jpg` (1280×640) for the repository social preview image; the manual upload
+  step is documented in `PUBLISHING.md`.
 
 ## [0.2.0] - 2026-10-02
 

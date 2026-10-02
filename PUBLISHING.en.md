@@ -149,6 +149,35 @@ take the `latest` dist-tag.
 5. Re-check that the CI badge in the README header resolves once the first workflow run is
    green: `gh run list --repo <you>/dsh-rehearsal`.
 
+## Repository images and social preview
+
+- `assets/poster.jpg` (1774×887, 233 KB) is the centered poster at the top of both READMEs.
+  The markup follows `wuwaka/dsh-clipboard-menu`: the first line inside
+  `<div align="center">` is `<img src="assets/poster.jpg" width="620" alt="…">`, with the alt
+  text written as a checkable description. The neighbour `dsh-plugin-gating-hub` uses
+  `width="1170"` (full content width); at 620 the two Chinese subtitle lines on the poster read
+  small, so that single number is the knob to turn.
+- `assets/social-preview.jpg` (1280×640, 153 KB) is the repository **social preview image**,
+  uploaded by hand under Settings → General → Social preview. There is no endpoint for this
+  step: checked on 2026-10-03, the REST repository object exposes no social-preview field. It
+  controls what shows when the repository URL is shared or unfurled, not the GitHub search
+  results list itself.
+- Both files regenerate from one source poster (the 1.88 MB original is not committed):
+
+  ```sh
+  python - <<'PY'
+  from PIL import Image
+  src = Image.open('poster-source.png').convert('RGB')          # 1774x887, 2:1
+  src.save('assets/poster.jpg', quality=88, optimize=True, progressive=True)
+  src.resize((1280, 640), Image.LANCZOS).save(
+      'assets/social-preview.jpg', quality=90, optimize=True, progressive=True)
+  PY
+  ```
+
+- Relative image paths generally do not resolve on the npm package page, so the poster is
+  expected to render on GitHub only. Not verified here: the package is unpublished, and this
+  needs re-checking after the first npm publish.
+
 ## Documentation rules that are easy to break
 
 - Every document is bilingual: `README.md` / `README.en.md`, `CHANGELOG.zh.md` /
