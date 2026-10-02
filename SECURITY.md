@@ -14,7 +14,7 @@
 | 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
 | 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:56-75` |
 | 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:75` |
-| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:136`；另有测试对最终报告 grep 家目录与推理标记 |
+| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:199`；另有测试对最终报告 grep 家目录与推理标记 |
 | 默认同时按行 id 与包名前缀抑制工具提供方；仅当会话历史中的全部工具都在只读允许清单内时才演练（fail-closed） | `src/lib/shadow.js`、`src/lib/drill.js` |
 | 影子 home 内含明文会话副本，所有退出路径都会删除，结果记录为 `shadowCleanup` | `src/commands/run.js` |
 
@@ -32,7 +32,7 @@
 
 `report.json` 与 `report.md` 派生自本地会话数据。脱敏是过滤器，不是证明：不要把报告文件或 `run` 输出粘贴到公开 issue。两份文件只留在磁盘上，本工具不上传任何内容。
 
-过滤器覆盖的形状：`C:\Users\<n>`、`/home/<n>`、`/Users/<n>` 归一为 `~`；任意盘符路径、任意 POSIX 绝对路径（含 `/root/.dsh`、`/var/lib/<服务名>`、`/srv/<团队>`、`/tmp/<影子目录>`）、UNC 共享 `\\server\share\…`、以及 `../` 形式的上级相对路径，一律归一为 `<abs-path>` / `<unc-path>` / `<rel-path>`。仓库相对文本（`src/lib/x.js:12`、`sessions/<ws>/…`）与 URL 有意保留，各有测试锁定。
+过滤器覆盖的形状：`C:\Users\<n>`、`/home/<n>`、`/Users/<n>` 归一为 `~`；任意盘符路径、任意 POSIX 绝对路径（含 `/root/.dsh`、`/var/lib/<服务名>`、`/srv/<团队>`、`/tmp/<影子目录>`）、UNC 共享 `\\server\share\…`、以及 `../` 形式的上级相对路径，一律归一为 `<abs-path>` / `<unc-path>` / `<rel-path>`。仓库相对文本（`src/lib/drill.js:217`、`sessions/<ws>/…`）与 URL 有意保留，各有测试锁定。
 
 两道结构性保障，而不是继续加正则：
 

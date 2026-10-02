@@ -82,7 +82,7 @@ one-shot runner 拒绝携带 `agentPreset` 的会话。`--preset-mode patch` 在
 
 | 工具 | 已实现的范围 | 与本项目边界 |
 |---|---|---|
-| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | 契约预检 → 配置备份与全树回滚点 → 执行框架升级、失败自动回滚；启动失败隔离按启动日志点名定位肇事插件后禁用（预设改名 `.broken-*`）；环境指纹可发现其他通道引入的框架变更 | 运行于 profile 内，预检形式是契约集合差分（`lib/server/domain/format-contract.js:4-7`）。其 `CHANGELOG.md:875` 列出的未验证项包含：未跑过带预设的会话，因为"那需要新建会话 + 真实模型调用" |
+| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | 契约预检 → 配置备份与全树回滚点 → 执行框架升级、失败自动回滚；启动失败隔离按启动日志点名定位肇事插件后禁用（预设改名 `.broken-*`）；环境指纹可发现其他通道引入的框架变更 | 运行于 profile 内，预检形式是契约集合差分（`lib/server/domain/format-contract.js:4-7`）。其 `dsh-plugin-gating-hub/CHANGELOG.md:875` 列出的未验证项包含：未跑过带预设的会话，因为"那需要新建会话 + 真实模型调用" |
 | [`@linxin666/dsh-doctor` 救援舱](https://github.com/zhu1090093659/dsh-web) | 固定 DSH 运行时与隔离 `DSH_HOME`，对候选执行隔离 `dump-config` 与 Web 健康门禁，通过后提升，失败按字节回滚 | 门禁对象是装载器与配置面；其发布 tarball 的 node 侧代码不含 `session` / `sessions/` 引用 |
 | [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) | 安装 → patch 生效 → 冷启动 → 卸载 → 清理，`mkdtemp` 影子 `DSH_HOME` 与独立 pnpm store；`schema: "dsh-test-drive/v1"`；`action.yml` 输出 Markdown 与 JUnit XML | 其 `capability` 阶段需要 API 键，且对象是新建会话 |
 | [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | 启动"现有 profile bundle 集 + 候选插件"的一次性组合（`profiles/canary-<rand>`，绝对符号链接复用 `node_modules`），L1 可钉 `dsh` 版本 | 变更对象是插件，不读写会话数据 |

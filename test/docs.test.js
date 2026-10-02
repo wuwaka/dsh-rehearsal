@@ -96,3 +96,84 @@ test('no document regressed into first-person prose', () => {
     assert.equal(/\bI\b|\b(we|our|us)\b/.test(read(f)), false, `${f} contains first-person narration`);
   }
 });
+
+const DOC_FILES = PAIRS.flat();
+// AUDIT.md describes its stated baseline commit, not HEAD: its line numbers were
+// correct against 7c374bc and the code has since moved. Asserting them against
+// today's tree would be wrong in both directions - it would fail on accurate
+// history and tempt someone to "fix" a record that is not broken. So the
+// citation checks below run over the living docs only.
+const LIVING_DOCS = DOC_FILES.filter((f) => !f.startsWith('AUDIT'));
+const CITE_RE = /([\w./-]+\.(?:js|mjs|ts|yml|yaml|json|md)):(\d+)(?:-(\d+))?/g;
+
+// Every in-repo line citation the docs use, with something that must appear on
+// the cited line. A citation is an assertion, not a decoration: when code moves,
+// the doc quoting the old number starts failing here instead of quietly sending
+// readers to the wrong place. (report.js:136 drifted to 199 unnoticed for a
+// whole review round.)
+const CITED_LINES = [
+  ['src/lib/report.js', 199, /export function finalize\(report\)/],
+  ['src/lib/util.js', 56, /credential-shaped variable/],
+  ['src/lib/util.js', 75, /DSH_TELEMETRY_MODE = 'DISABLED'/],
+  ['src/lib/drill.js', 14, /WRITE_FAIL_SIGNATURES = \[/],
+  ['src/lib/drill.js', 22, /preset-not-composed/],
+  ['src/lib/drill.js', 28, /cwd-mismatch/],
+  ['src/lib/drill.js', 101, /export function writeRoundVerdict/],
+  ['src/lib/drill.js', 217, /export function classifyToolResults/],
+  ['src/lib/drill.js', 312, /v4z/],
+  ['src/lib/drill.js', 323, /hasAssistantMessage/],
+  ['src/lib/drill.js', 324, /formatFail/],
+  ['src/lib/drill.js', 325, /replayMissed/],
+  ['src/commands/run.js', 21, /patch-entry-not-found/],
+  ['src/commands/run.js', 22, /port-in-use/],
+  ['src/commands/run.js', 23, /module-missing/],
+  ['src/commands/run.js', 164, /two cold boots/],
+  ['src/commands/run.js', 169, /MISSING_CREDENTIAL/],
+];
+
+// Paths that live in somebody else's repository, each with a marker that must
+// appear on the citing line so the reader knows whose file it is.
+const EXTERNAL_CITES = {
+  'README.zh.md': 'gating-hub',
+  'CHANGELOG.md': 'gating-hub',
+  'lib/server/domain/format-contract.js': 'gating-hub',
+  'lib/index.js': 'dsh-backup',
+  'scripts/check-submission.mjs': 'awesome-dsh-plugin',
+  'scripts/lib/entries.mjs': 'awesome-dsh-plugin',
+};
+
+function docCitations() {
+  const found = [];
+  for (const doc of LIVING_DOCS) {
+    for (const line of read(doc).split(/\r?\n/)) {
+      for (const m of line.matchAll(CITE_RE)) {
+        found.push({ doc, path: m[1], start: Number(m[2]), end: Number(m[3] ?? m[2]), line });
+      }
+    }
+  }
+  return found;
+}
+
+test('docs cite only files that exist here, or are declared as external', () => {
+  const cites = docCitations();
+  assert.ok(cites.length >= 20, `citation inventory shrank to ${cites.length}`);
+  for (const c of cites) {
+    if (fs.existsSync(path.join(root, c.path))) continue;
+    const owner = Object.entries(EXTERNAL_CITES).find(([p]) => c.path.endsWith(p));
+    assert.ok(owner, `${c.doc} cites "${c.path}:${c.start}" which exists neither in this repository nor among the declared external files`);
+    assert.ok(c.line.includes(owner[1]), `${c.doc}: external cite "${c.path}" must name its owner ("${owner[1]}") on the same line`);
+  }
+});
+
+test('every in-repo line citation is backed by an assertion about that line', () => {
+  for (const [file, line, pattern] of CITED_LINES) {
+    const text = read(file).split(/\r?\n/)[line - 1];
+    assert.notEqual(text, undefined, `${file}:${line} does not exist`);
+    assert.match(text, pattern, `${file}:${line} no longer holds what the docs cite it for`);
+  }
+  for (const c of docCitations()) {
+    if (!fs.existsSync(path.join(root, c.path))) continue;
+    const covered = CITED_LINES.some(([f, l]) => f === c.path && (l === c.start || l === c.end));
+    assert.ok(covered, `${c.doc} cites ${c.path}:${c.start}${c.end !== c.start ? '-' + c.end : ''} with nothing asserting it - add the line to CITED_LINES or correct the number`);
+  }
+});

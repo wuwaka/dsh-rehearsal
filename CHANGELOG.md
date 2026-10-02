@@ -61,6 +61,20 @@ refuses to publish when either lacks the section for a tag.
   location itself and disagreed with the hardened `defaultHome()`, labelling a genuine default as
   `custom`; the caller now passes one source of truth in (test count 73 → 78).
 
+- Line citations in documentation go stale as code moves, and until now nothing could detect it.
+  Four real failures fixed this round: `SECURITY` cited `src/lib/report.js:136`, which pointed at
+  unrelated code after `finalize()` moved (it is 199); the "must not be over-masked" example was
+  written as `src/lib/x.js:12`, a file that does not exist; `docs/FAILURE_MODES` cited
+  `src/lib/drill.js:311-313`, off by one (312-314); and an external citation to `CHANGELOG.md:875`
+  collided with our own file of the same name, so it is now written as
+  `dsh-plugin-gating-hub/CHANGELOG.md:875`.
+- Two assertions added (test count 78 → 80): every path cited by a living document must either exist
+  in this repository or be qualified with its owner on the same line, and every in-repo `file:line`
+  citation must be backed by an assertion that the cited line really contains what the docs claim it
+  for — a new unasserted citation fails the suite rather than drifting silently. `AUDIT.md` is
+  deliberately excluded: it describes the baseline commit it names, so checking its numbers against
+  HEAD would be wrong in both directions.
+
 ## [0.2.0] - 2026-10-02
 
 Documentation and release integrity. No behaviour change to `check` or `run`.

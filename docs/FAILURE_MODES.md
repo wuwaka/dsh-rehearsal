@@ -27,7 +27,7 @@
 |---|---|---|---|---|---|
 | `v4-producer-source-kind` | `format v4 message requires a producer-owned source kind` | `src/lib/drill.js:14-20`，写回合判 `fail`（`src/lib/drill.js:324`） | 会话中存在 v3 遗留 `source.kind:"plugin"` 行：读侧校验全部通过，每个写回合失败 | 上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229)，标题即此句 | 否。`0.2.0-rc.1` 起 `@deepseek-ai/dsh-session-format-v3-to-v4` 迁移包自带 `producerKind` 改写映射（rc.1 与 0.2.0-rc.2 的 `lib` 目录逐字节一致），本机数据在迁移时已被改写。检测保留，用于未来宿主或历史数据出现该形态时命中 |
 | `SessionFormatError` | `SessionFormatError`（无 id，正则直接匹配） | `src/lib/drill.js:324`，写回合判 `fail` | 迁移后产物被宿主以格式原因拒绝 | 与上一行同族，形态更宽 | 否，同上一行 |
-| `no v4 generation after write round` | 无日志匹配，判据为产物缺失：写回合后 `session.v4.jsonl.zstd` 不存在 | `src/lib/drill.js:311-313`，判 `fail` | 宿主拒绝写出该代，或迁移链在写路径上中断 | 本工具判据（退出不参与判定） | 否 |
+| `no v4 generation after write round` | 无日志匹配，判据为产物缺失：写回合后 `session.v4.jsonl.zstd` 不存在 | `src/lib/drill.js:312-314`，判 `fail` | 宿主拒绝写出该代，或迁移链在写路径上中断 | 本工具判据（退出不参与判定） | 否 |
 
 ## 二、启动阶段签名
 
