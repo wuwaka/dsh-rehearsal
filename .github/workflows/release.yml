@@ -9,10 +9,20 @@ name: Release
 #
 # The tarball plus its checksum are attached so an install line can be pinned to
 # bytes. Publishing to npm happens in publish.yml, on `release: published`.
+#
+# workflow_dispatch exists so the notes or assets of an already-cut tag can be
+# rebuilt without moving a public tag: the job checks the tag out, so package.json
+# and CHANGELOG still come from the tagged commit even when this file is newer.
 
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: existing v* tag to rebuild the release for
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -21,7 +31,18 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve the tag
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          case "$tag" in v*) ;; *) echo "::error::$tag is not a v* tag"; exit 1 ;; esac
+          echo "name=$tag" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.tag.outputs.name }}
 
       - uses: actions/setup-node@v7
         with:
@@ -31,9 +52,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          tag="${{ steps.tag.outputs.name }}"
           pkg="$(node -p "require('./package.json').version")"
-          if [ "v${pkg}" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match package.json version v${pkg}"
+          if [ "v${pkg}" != "$tag" ]; then
+            echo "::error::tag ${tag} does not match package.json version v${pkg}"
             exit 1
           fi
 
@@ -58,32 +80,37 @@ jobs:
 
       - name: Build release notes from CHANGELOG
         shell: bash
+        env:
+          TAG: ${{ steps.tag.outputs.name }}
         run: |
           set -euo pipefail
           {
             echo '```sh'
-            echo "npm install -g github:wuwaka/dsh-rehearsal#${GITHUB_REF_NAME}"
+            echo "npm install -g github:wuwaka/dsh-rehearsal#${TAG}"
             echo '```'
             echo
-            echo "Or pinned to bytes: \`npm install -g https://github.com/wuwaka/dsh-rehearsal/releases/download/${GITHUB_REF_NAME}/${TARBALL}\`"
+            echo "Or pinned to bytes: \`npm install -g https://github.com/wuwaka/dsh-rehearsal/releases/download/${TAG}/${TARBALL}\`"
             echo "(verify with the attached \`${SHAFILE}\`.)"
             echo
-            node scripts/changelog-section.mjs "$GITHUB_REF_NAME"
+            node scripts/changelog-section.mjs "$TAG"
           } > release-notes.md
 
       - name: Publish the release with assets
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
         run: |
           set -euo pipefail
           pre=()
-          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease) ;; esac
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
+          case "$TAG" in *-*) pre=(--prerelease) ;; esac
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release edit "$TAG" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
           else
-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
           fi
-          gh release upload "$GITHUB_REF_NAME" "$TARBALL" "$SHAFILE" --clobber
-          gh release view "$GITHUB_REF_NAME" --json tagName,prerelease,assets \
-            --jq '.tagName + " prerelease=" + (.prerelease|tostring) + " assets=" + ([.assets[].name]|join(","))'
+          gh release upload "$TAG" "$TARBALL" "$SHAFILE" --clobber
+          # isPrerelease, not prerelease: gh's release JSON gained that field name
+          # and the wrong one fails the run after the release is already published.
+          gh release view "$TAG" --json tagName,isPrerelease,isDraft,assets \
+            --jq '.tagName + " draft=" + (.isDraft|tostring) + " prerelease=" + (.isPrerelease|tostring) + " assets=" + ([.assets[].name]|join(","))'
