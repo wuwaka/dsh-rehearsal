@@ -53,7 +53,7 @@ export function newReport({ candidateVersion, profile, command }) {
       // messages are never read by the tool itself (session bodies are only
       // ever byte-scanned for poison-row counts, never stored or echoed).
       messageContentInReports: false,
-      stderrEvidence: 'filtered to dsh:/error/stack diagnostic lines; prose dropped and counted',
+      stderrEvidence: 'filtered to dsh:, error:, and stack-frame diagnostic lines; prose dropped and counted',
       telemetry: 'DSH_TELEMETRY_MODE=DISABLED and credential-shaped env vars stripped for all candidate runs',
       keyless: 'no provider credentials are present in any child environment',
       redactedEnv: redactedEnvNames(),
@@ -81,14 +81,27 @@ export function finalizeVerdict(report) {
 }
 
 /**
- * Scrub ONE STRING. Rules (audit P1-2 broadened):
+ * Scrub ONE STRING. Rules:
  *  1. user home dirs on any platform -> `~` (C:\Users\<n>, /home/<u>, /Users/<u>)
- *  2. ANY other drive-rooted absolute path -> `<abs-path>` (any drive letter,
- *     forward AND back slashes, and spaces inside the path are consumed too)
- *  3. credential shapes
+ *  2. drive-rooted absolute path -> `<abs-path>` (any drive letter, both slash
+ *     directions, spaces inside the path consumed too)
+ *  3. POSIX absolute path with >=2 segments -> `<abs-path>`. Without this the
+ *     filter only knew /home and /Users, so /root/.dsh (running as root, common
+ *     in containers), /var/lib/<svc>, /srv/<team> and /tmp/<shadow> passed
+ *     through untouched.
+ *  4. UNC share -> `<unc-path>`; parent-relative `../` or `..\` -> `<rel-path>`
+ *  5. credential shapes
+ * Deliberately greedy to the next field delimiter: over-masking a prose span is
+ * safe, leaking the tail of a path is not. URLs survive because the boundary
+ * class excludes the `:` of `://` from starting a match, and `//` cannot begin a
+ * segment. Repo-relative text (`src/lib/x.js:12`, `sessions/<ws>/file`) has no
+ * leading separator and is left alone.
  * Applied per string VALUE via scrubValue — never to a JSON.stringify'd blob,
  * where Windows paths become double-backslash and no regex matches.
  */
+const FIELD = '[^"\'`,;|\\n\\r]*';
+const BOUND = '(^|[\\s=("\'`:;])';
+
 export function scrubText(s) {
   let out = String(s);
   out = out.replace(/\b[A-Za-z]:[\\/]Users[\\/][^\\/\s"']+/g, '~');
@@ -96,13 +109,28 @@ export function scrubText(s) {
   // Paths may contain spaces ("My Docs", "Program Files"). Stopping the match
   // at whitespace redacted only the leading segments and LEAKED THE TAIL —
   // measured on a real machine: `D:\Work\a b\c.log` came out as
-  // `<abs-path> b\c.log`. Consume to the end of the field instead, delimited
-  // by the separators that actually appear in details/stderr summaries
-  // (quote, pipe, comma, semicolon, EOL) so prose around a path survives.
-  out = out.replace(/\b[A-Za-z]:[\\/][^"'|,;\n\r]*/g, '<abs-path>');
+  // `<abs-path> b\c.log`. Consume to the end of the field instead.
+  out = out.replace(new RegExp(`\\b[A-Za-z]:[\\\\/]${FIELD}`, 'g'), '<abs-path>');
+  out = out.replace(new RegExp(`${BOUND}\\/(?:[^\\/"'\`,;|\\n\\r]+\\/)${FIELD}`, 'g'), '$1<abs-path>');
+  out = out.replace(new RegExp(`${BOUND}\\\\\\\\${FIELD}`, 'g'), '$1<unc-path>');
+  out = out.replace(new RegExp(`${BOUND}\\.\\.[\\\\/]${FIELD}`, 'g'), '$1<rel-path>');
   out = out.replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]');
   out = out.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]');
   return out;
+}
+
+/** Shapes that must never appear in a report. Used by the finalize() invariant. */
+export function findPathShapes(text) {
+  const t = String(text);
+  const pats = [
+    /\b[A-Za-z]:[\\/]/g,
+    /(^|[\s=("'`:;])\/(?:[^/"'`,;|\n\r]+\/)/g,
+    /(^|[\s=("'`:;])\\\\/g,
+    /(^|[\s=("'`:;])\.\.[\\/]/g,
+  ];
+  const hits = [];
+  for (const p of pats) for (const m of t.matchAll(p)) hits.push(m[0].trim());
+  return hits;
 }
 
 /** Recursively scrub every string leaf of an evidence value. */
@@ -111,7 +139,9 @@ export function scrubValue(v) {
   if (Array.isArray(v)) return v.map(scrubValue);
   if (v && typeof v === 'object') {
     const out = {};
-    for (const [k, x] of Object.entries(v)) out[k] = scrubValue(x);
+    // Keys are scrubbed too: an object keyed by a path (`{ '/root/.dsh': … }`)
+    // used to bypass redaction entirely, since only values passed through.
+    for (const [k, x] of Object.entries(v)) out[scrubText(k)] = scrubValue(x);
     return out;
   }
   return v;
@@ -166,5 +196,16 @@ export function finalize(report) {
   if (report.coverage) report.coverage = scrubValue(report.coverage);
   if (report.target) report.target = scrubValue(report.target);
   if (Array.isArray(report.warnings)) report.warnings = report.warnings.map((w) => scrubText(w));
+  // Invariant rather than a filter: the rules above know the shapes seen so far,
+  // and a later stage can compose one they do not. Surviving path-shaped text is
+  // surfaced as a warning instead of shipping silently — a redacted report that
+  // says it might not be fully redacted is honest, one that is silently wrong is
+  // the failure this tool exists to avoid.
+  const scanned = JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k !== 'warnings')));
+  const leftover = [...new Set(findPathShapes(scanned))];
+  if (leftover.length) {
+    if (!Array.isArray(report.warnings)) report.warnings = [];
+    report.warnings.push(`redaction gap: ${leftover.length} path-shaped token(s) survived scrubbing (e.g. ${leftover.slice(0, 3).join(', ')}) — treat this report as unsanitised until scrubText learns the shape`);
+  }
   return report;
 }

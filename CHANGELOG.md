@@ -37,6 +37,15 @@ refuses to publish when either lacks the section for a tag.
 - Regression locks: `homeShape` must never return a value containing a path separator, and an
   end-to-end `check` with a **relative** `--home` asserts that the path appears nowhere in the report
   (test count 68 → 70).
+- The change above only kept one call site away from the filter; the gap in `scrubText` itself
+  remained. `/root/.dsh` (the default home for root, and the normal case in containers),
+  `/var/lib/<service>`, `/srv/<team>`, `/tmp/<shadow>`, UNC shares and `../` relative paths all passed
+  through untouched. Fixed as a **class** this time: the filter now covers those shapes, with tests
+  pinning that URLs and repository-relative text are not over-masked; `scrubValue` redacted values but
+  not object keys, so a path used as a key bypassed redaction entirely and now does not; and
+  `finalize()` gained an invariant that re-scans the whole report with the same detector and records
+  any surviving path-shaped text in `warnings[]` (`redaction gap: …`), so a future stage that composes
+  an unknown style admits it instead of publishing the path silently (test count 70 → 73).
 
 ## [0.2.0] - 2026-10-02
 

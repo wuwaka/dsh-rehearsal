@@ -32,7 +32,14 @@ The properties below are enforced in code and covered by tests. A report that an
 
 `report.json` and `report.md` derive from local session data. Redaction is a filter, not a proof: do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
-The filter recognizes a bounded set of shapes: `C:\Users\<name>`, `/home/<name>` and `/Users/<name>` collapse to `~`, and any drive-rooted absolute path collapses to `<abs-path>`. It does **not** recognize a Unix home outside `/home` (for example `/srv/users/<name>` or `/var/lib/<service>`), a UNC share, or a relative path. Fields that must appear in a report and would otherwise carry such a value now record a shape instead (`home=default|custom|unknown`) so the path never enters the string: relying on a regex to mask a shape known to slip through is not a sound design. Other free-text fields remain covered by that bounded set only.
+Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse to `~`; any drive-rooted path, any POSIX absolute path (including `/root/.dsh`, `/var/lib/<service>`, `/srv/<team>` and `/tmp/<shadow>`), any UNC share `\\server\share\…` and any parent-relative `../` collapse to `<abs-path>` / `<unc-path>` / `<rel-path>`. Repository-relative text (`src/lib/x.js:12`, `sessions/<ws>/…`) and URLs are preserved on purpose, each with a test pinning it.
+
+Two structural guarantees rather than more regexes:
+
+- **paths are not written in the first place where a path is not the fact**. Fields such as DSH_HOME record a shape (`home=default|custom|unknown`), so no path ever enters the string.
+- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`). A future stage that composes a new path style therefore admits it, instead of quietly publishing the path.
+
+What remains true: this is still best-effort filtering, not a proof. Do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
 ## Out of scope
 

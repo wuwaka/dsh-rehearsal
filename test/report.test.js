@@ -148,6 +148,68 @@ test('run-level warnings surface in JSON, Markdown and are scrubbed (round 4)', 
   assert.ok(md.includes('no preset-carrying session'), 'markdown must show the caveat next to the verdict');
 });
 
+test('scrubText masks every absolute-path shape and keeps repo-relative text', () => {
+  const BS = String.fromCharCode(92);
+  const mustMask = [
+    `home=/root/.dsh; x`,
+    `home=/var/lib/jenkins/.dsh; x`,
+    `home=/srv/team/dsh-home; x`,
+    `shadow=/tmp/dsh-rehearsal-home-abc123; x`,
+    `cwd=${'D:' + BS + 'Work' + BS + 'a b' + BS + 'c.log'}; x`,
+    `up=../../secret/x; y`,
+    `unc=${BS}${BS}fs01${BS}team${BS}dsh; z`,
+  ];
+  for (const line of mustMask) {
+    const out = scrubText(line);
+    const leaked = ['/root', '/var/lib', '/srv', '/tmp', 'a b', 'fs01', '../'].filter((s) => out.includes(s));
+    assert.deepEqual(leaked, [], `shape survived: ${out}`);
+  }
+  // the same call must not eat text that is legitimately path-shaped in a report
+  const mustKeep = [
+    'url=https://github.com/wuwaka/dsh-rehearsal',
+    'site=//github.com/x',
+    'file=src/lib/report.js:136',
+    'doc=docs/FAILURE_MODES.md',
+    'shape=sessions/<ws>/<id>/session.v4.jsonl.zstd',
+    'ref=link:github:wuwaka/dsh-rehearsal',
+  ];
+  for (const line of mustKeep) assert.equal(scrubText(line), line, `over-masked: ${line}`);
+});
+
+test('a future stage cannot bypass redaction by composing a path', () => {
+  const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'run' });
+  addStage(r, {
+    id: 'x-future',
+    title: 'simulated later stage',
+    verdict: 'pass',
+    // values AND keys AND a nested array - every route a path can take into evidence
+    details: 'shadow=/root/.dsh kept=/srv/team/x',
+    evidence: [{ '/var/lib/jenkins/.dsh': ['../private/thing', 'D:Worka b.log'] }],
+  });
+  finalize(r);
+  const raw = JSON.stringify(r);
+  assert.ok(!raw.includes('/root/'), 'value path must not survive');
+  assert.ok(!raw.includes('/var/lib/'), 'evidence KEY path must not survive');
+  assert.ok(!raw.includes('../private'), 'array path must not survive');
+  assert.ok(!raw.includes('redaction gap'), 'known shapes are masked, so no warning is needed');
+});
+
+test('an unknown path shape is surfaced as a warning, not shipped silently', () => {
+  const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'run' });
+  addStage(r, {
+    id: 'x-unknown-field',
+    title: 'stage carrying a field scrubStage never heard of',
+    verdict: 'pass',
+    details: 'ok',
+    evidence: [],
+  });
+  // a later stage adding a free-form field is the realistic bypass: scrubStage
+  // only knows details + evidence, so this must be caught by the invariant
+  r.stages[0].scratch = 'mnt=/mnt/Data Disk/dsh-shadow-1';
+  finalize(r);
+  assert.ok(r.warnings.some((w) => /redaction gap/.test(w)), 'the invariant must flag what the filter missed');
+});
+
 test('homeShape describes a DSH_HOME without ever returning its path', () => {
   const p = path_module;
   const def = process.env.DSH_HOME || p.join(process.env.USERPROFILE || process.env.HOME || '', '.dsh');
