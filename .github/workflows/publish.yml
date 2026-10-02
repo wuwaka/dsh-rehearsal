@@ -1,0 +1,67 @@
+name: Publish to npm
+
+# Runs on a published GitHub Release. Publishing from CI (rather than a laptop)
+# is what lets the tarball carry signed provenance, so users can verify where the
+# bits came from.
+#
+# The job is SKIPPED, not failed, when NPM_TOKEN is absent - a repo without the
+# secret must not show a red release pipeline.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for npm provenance attestation
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      can-publish: ${{ steps.check.outputs.defined }}
+    steps:
+      - id: check
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "defined=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::NPM_TOKEN secret not set - publish skipped"
+          else
+            echo "defined=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: gate
+    if: needs.gate.outputs.can-publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      # Publish exactly what the tests saw, from this commit. No build step
+      # exists, so the tarball is the repository content filtered by `files`.
+      - run: npm test
+
+      - name: Verify the packed tarball is usable before publishing
+        run: |
+          set -euo pipefail
+          tarball=$(npm pack --silent | tail -1)
+          mkdir -p /tmp/pkgtest
+          npm install --no-audit --no-fund --prefix /tmp/pkgtest "./$tarball"
+          node /tmp/pkgtest/node_modules/dsh-rehearsal/src/cli.js --version
+          node /tmp/pkgtest/node_modules/dsh-rehearsal/src/cli.js --help > /dev/null
+          echo "packed tarball verified: $tarball"
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

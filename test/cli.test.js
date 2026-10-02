@@ -120,3 +120,20 @@ test('unknown command and bad report path exit 3', () => {
   assert.equal(runCli(['report', path.join(os.tmpdir(), 'definitely-not-here-' + Date.now())]).status, 3);
   assert.match(runCli([]).stdout, /Commands:/);
 });
+
+test('--help and --version are real flags, not "unknown command" (installed-CLI contract)', () => {
+  // The conventional first thing anyone types after `npm i -g` must not exit 3:
+  // that code means "the rehearsal itself failed" in this tool's contract.
+  for (const flag of ['--help', '-h']) {
+    const r = runCli([flag]);
+    assert.equal(r.status, 0, `${flag} exited ${r.status}`);
+    assert.match(r.stdout, /Commands:/);
+  }
+  const v = runCli(['--version']);
+  assert.equal(v.status, 0);
+  assert.match(v.stdout, /^dsh-rehearsal \d+\.\d+\.\d+ \(node v\d+\./);
+  // a genuinely unknown command still exits 3, and says so
+  const bad = runCli(['--hedl']);
+  assert.equal(bad.status, 3);
+  assert.match(bad.stderr, /unknown command/);
+});

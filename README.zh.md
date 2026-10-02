@@ -161,7 +161,7 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## 开发
 
 ```sh
-npm test        # 51 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
+npm test        # 52 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
                 # 沙箱 cwd 重写 + 目录编码 / stderr 消毒器 / 结构化脱敏 / 只读允许清单 /
                 # env 剔除 / countRows 结构 / 分层采样 / writeRoundVerdict /
                 # warnings 渲染与脱敏 / check 端到端 CLI 冒烟

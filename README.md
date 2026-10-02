@@ -162,7 +162,7 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## Development
 
 ```sh
-npm test        # 51 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
+npm test        # 52 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
                 # peer grading / sandbox cwd rewrite + dir encoding / stderr sanitizer /
                 # structured scrubbing / read-only allowlist / env stripping /
                 # countRows structure / stratified selection / writeRoundVerdict /

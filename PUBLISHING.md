@@ -24,7 +24,7 @@ git commit -m "dsh-rehearsal 0.1.0: static upgrade pre-flight + keyless session 
 git diff --stat main publish-clean          # must print nothing (identical tree)
 git ls-tree -r --name-only publish-clean    # no .dsh-rehearsal/, no node_modules/, no fixtures
 git grep -nE "<TOKENS>" publish-clean --    # your own username / drive layout; expect no output
-npm test                                    # 51/51
+npm test                                    # 52/52
 git remote add origin https://github.com/<you>/dsh-rehearsal.git
 git push origin publish-clean:main
 ```
@@ -41,9 +41,24 @@ out of the repo.
 
 ## After the repo is public
 
-1. `npm publish` (name `dsh-rehearsal` is unclaimed as of 2026-10-02; the community has a habit of
-   reserving names without publishing, so claim it when you are ready). `files` limits the tarball to
-   `src/`, the two READMEs and `LICENSE`.
+1. **Publish to npm from CI.** `.github/workflows/publish.yml` runs on `release: published`, re-tests,
+   installs the packed tarball into a throwaway prefix and smoke-runs it, then `npm publish --provenance`.
+   It **skips itself** when `NPM_TOKEN` is absent, so a repo without the secret shows no red pipeline:
+
+   ```sh
+   gh secret set NPM_TOKEN --repo <you>/dsh-rehearsal --body "<granular access token, Publish scope>"
+   ```
+
+   Publishing from a laptop is possible but note the trap on this machine: the default
+   `registry` in `~/.npmrc` is `registry.npmmirror.com`, a read-only mirror that answers 404 for
+   `npm whoami` and cannot accept a publish. Either use CI, or pass both overrides explicitly:
+
+   ```sh
+   npm publish --registry https://registry.npmjs.org // needs an auth token for that registry
+   ```
+
+   The name `dsh-rehearsal` was still unclaimed on 2026-10-02; the community has a habit of
+   reserving names without publishing, so claim it when you are actually ready.
 2. Set the GitHub topic `dsh-plugin` so directory scrapers find it:
    `gh api repos/<you>/dsh-rehearsal -f "topics[]=dsh-plugin" -X PUT` (topics need the
    `repo` scope).

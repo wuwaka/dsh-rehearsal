@@ -65,6 +65,19 @@ function parseArgs(argv) {
 
 async function main() {
   const [, , cmd, ...rest] = process.argv;
+  // `--help` arrives here as the command word, so it must be matched before
+  // parseArgs/switch — otherwise the conventional invocation of an installed
+  // CLI falls through to "unknown command" and exits 3, which this tool
+  // documents as "the rehearsal itself failed".
+  if (cmd === '-h' || cmd === '--help') {
+    console.log(USAGE);
+    return;
+  }
+  if (cmd === '-v' || cmd === '--version' || cmd === '-V') {
+    const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+    console.log(`${pkg.name} ${pkg.version} (node ${process.version})`);
+    return;
+  }
   const opts = parseArgs(rest);
   switch (cmd) {
     case 'check': {
