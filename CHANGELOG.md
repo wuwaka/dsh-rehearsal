@@ -7,8 +7,8 @@ One naming note, because it is easy to confuse: the version below is
 **`dsh-rehearsal`'s own**. `run --to <version>` rehearses *someone else's*
 version — the candidate `dsh` — and that number is never recorded here.
 
-中文说明见 [README.md](README.md)；本文件保持英文，因为 `.github/workflows/release.yml`
-直接把对应小节的正文取作 Release 说明。
+中文对应版本见 [CHANGELOG.zh.md](CHANGELOG.zh.md)。两份文件的小节必须一一对应 ——
+`test/changelog.test.js` 断言这件事，`.github/workflows/release.yml` 在缺任一份时拒绝发布。
 
 ## [Unreleased]
 

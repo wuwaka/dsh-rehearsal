@@ -101,23 +101,36 @@ out of the repo.
 `release.yml` runs on a `v*` tag push and **refuses** in two cases, so the order matters:
 
 ```sh
-npm test                                     # must be green, 57/57
-# 1. CHANGELOG.md: move Unreleased content under a new "## [X.Y.Z] - YYYY-MM-DD" heading,
-#    add the [X.Y.Z] link at the bottom, and update the [Unreleased] compare range.
-# 2. package.json: "version" must equal X.Y.Z exactly.
-node scripts/changelog-section.mjs vX.Y.Z    # prints what the Release body will be
+npm test                                     # must be green, 61/61
+# 1. BOTH changelogs — CHANGELOG.zh.md and CHANGELOG.md: move Unreleased content under a
+#    new "## [X.Y.Z] - YYYY-MM-DD" heading in each (same versions, same order;
+#    test/changelog.test.js asserts the pair), add the [X.Y.Z] link at the bottom, and
+#    update the [Unreleased] compare range.
+# 2. package.json: "version" must equal X.Y.Z exactly, in the same commit.
+node scripts/release-notes.mjs vX.Y.Z        # prints exactly what the Release body will be
 git add -A && git commit -m "…"
 git tag -a "vX.Y.Z" -m "vX.Y.Z"
 git push origin publish-clean:main           # CI green first
 git push origin "vX.Y.Z"                     # triggers the Release job
 ```
 
+The Release body is generated from the tagged commit in **both languages**, with the two
+install lines prepended — house style here is 中文（新增/修复/变更）→ 安装 → `---` → English
+twin. A missing section in either changelog fails the job, so notes cannot be written
+afterwards from memory.
+
+To rebuild notes or assets for a tag that is already out there, use **Run workflow →
+`release.yml` → tag** rather than moving the public tag: the job checks the tag out, so
+`package.json` and the changelogs still come from the tagged commit even when this file
+on `main` is newer.
+
 Then verify the release actually carries what it claims:
 
 ```sh
 gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
-  --json tagName,prerelease,assets --jq '{tagName,prerelease,assets:[.assets[].name]}'
-# expect: dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
+  --json tagName,isDraft,isPrerelease,assets --jq '{tagName,isDraft,isPrerelease,assets:[.assets[].name]}'
+# expect: draft=false, isPrerelease=false (unless the tag carries a `-`),
+#         assets = dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
 ```
 
 A tag containing `-` (e.g. `v0.3.0-rc.1`) is marked `--prerelease` automatically, and

@@ -4,8 +4,9 @@ name: Release
 #
 # Two deliberate refusals, both because a wrong artifact is worse than none:
 #   * the tag must equal package.json's version, or the job stops;
-#   * CHANGELOG.md must carry a section for that version, or the job stops, so
-#     no release ships with an empty "just look at the code" note.
+#   * both CHANGELOG.zh.md and CHANGELOG.md must carry a section for that version,
+#     or the job stops — so a Release can never ship with an empty "just look at
+#     the code" note, and the Chinese and English halves cannot drift apart.
 #
 # The tarball plus its checksum are attached so an install line can be pinned to
 # bytes. Publishing to npm happens in publish.yml, on `release: published`.
@@ -78,22 +79,13 @@ jobs:
           echo "TARBALL=$tarball" >> "$GITHUB_ENV"
           echo "SHAFILE=${tarball}.sha256" >> "$GITHUB_ENV"
 
-      - name: Build release notes from CHANGELOG
+      - name: Build release notes from both changelogs
         shell: bash
         env:
           TAG: ${{ steps.tag.outputs.name }}
         run: |
           set -euo pipefail
-          {
-            echo '```sh'
-            echo "npm install -g github:wuwaka/dsh-rehearsal#${TAG}"
-            echo '```'
-            echo
-            echo "Or pinned to bytes: \`npm install -g https://github.com/wuwaka/dsh-rehearsal/releases/download/${TAG}/${TARBALL}\`"
-            echo "(verify with the attached \`${SHAFILE}\`.)"
-            echo
-            node scripts/changelog-section.mjs "$TAG"
-          } > release-notes.md
+          node scripts/release-notes.mjs "$TAG" > release-notes.md
 
       - name: Publish the release with assets
         shell: bash

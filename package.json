@@ -6,7 +6,7 @@
   "license": "MIT",
   "engines": { "node": ">=22.19" },
   "bin": { "dsh-rehearsal": "src/cli.js" },
-  "files": ["src", "docs", "README.md", "README.en.md", "CHANGELOG.md", "LICENSE"],
+  "files": ["src", "docs", "README.md", "README.en.md", "CHANGELOG.md", "CHANGELOG.zh.md", "LICENSE"],
   "scripts": {
     "test": "node --test",
     "smoke:check": "node src/cli.js check"

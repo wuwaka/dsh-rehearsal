@@ -222,7 +222,7 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## Development
 
 ```sh
-npm test        # 57 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
+npm test        # 61 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
                 # peer grading / sandbox cwd rewrite + dir encoding / stderr sanitizer /
                 # structured scrubbing / read-only allowlist / env stripping /
                 # countRows structure / stratified selection / writeRoundVerdict /
@@ -234,11 +234,11 @@ The signature locks come in **pairs**: each log pattern must hit the real line c
 
 CI runs `npm ci` + `npm test` on **windows / macOS / linux × Node 22.19 and 24.x**, plus two guard assertions: the `node:zlib` zstd API this tool depends on must exist, and the test suite must not leave fixture homes in `$HOME`. **CI never runs `rehearsal run`** — it installs ~500 packages and replays real session copies, which is neither deterministic nor appropriate on a shared runner; the safety model is covered offline instead.
 
-Releases are tag-triggered (`.github/workflows/release.yml`): **the job stops if the tag does not equal `package.json`'s version, and stops if `CHANGELOG.md` has no section for it**, then attaches the tarball plus its `.sha256` and uses that section as the release body. `publish.yml` handles npm and skips itself rather than failing when `NPM_TOKEN` is absent.
+Releases are tag-triggered (`.github/workflows/release.yml`): **the job stops if the tag does not equal `package.json`'s version, and stops if either changelog lacks the matching section**, then attaches the tarball plus its `.sha256` and generates the body in house style (Chinese section → install → `---` → English section). `publish.yml` handles npm and skips itself rather than failing when `NPM_TOKEN` is absent.
 
 Before publishing, read [PUBLISHING.md](PUBLISHING.md): pushing this history as-is would publish a pre-scrub snapshot (13 real paths across 5 files). The repo ships a verified single-commit `publish-clean` branch for exactly that.
 
-Versioning policy, including which claims were retracted in which release, is in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog + SemVer; the version in `run --to <version>` is the **dsh under test**, unrelated to this tool's own number). What is enforced by code and tests, versus the two flags that are the operator's responsibility, is in [SECURITY.md](SECURITY.md). Publishing and catalog reality — including **why this should not be submitted** to the plugin directory — is in [PUBLISHING.md](PUBLISHING.md).
+Versioning policy, including which claims were retracted in which release, is in [CHANGELOG.md](CHANGELOG.md) — with [CHANGELOG.zh.md](CHANGELOG.zh.md) as the Chinese twin; the two must list the same versions in the same order, and `test/changelog.test.js` enforces that. Note that the version in `run --to <version>` is the **dsh under test**, unrelated to this tool's own number. What is enforced by code and tests, versus the two flags that are the operator's responsibility, is in [SECURITY.md](SECURITY.md). Publishing and catalog reality — including **why this should not be submitted** to the plugin directory — is in [PUBLISHING.md](PUBLISHING.md).
 
 ---
 

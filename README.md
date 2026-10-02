@@ -221,7 +221,7 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## 开发
 
 ```sh
-npm test        # 57 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
+npm test        # 61 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
                 # 沙箱 cwd 重写 + 目录编码 / stderr 消毒器 / 结构化脱敏 / 只读允许清单 /
                 # env 剔除 / countRows 结构 / 分层采样 / writeRoundVerdict /
                 # warnings 渲染与脱敏 / 签名回归锁 / check 端到端 CLI 冒烟
@@ -231,11 +231,11 @@ npm test        # 57 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读�
 
 CI 跑 `npm ci` + `npm test`，矩阵为 **windows / macOS / linux × Node 22.19 与 24.x**，外加两条护栏断言：本工具依赖的 `node:zlib` zstd API 必须存在；测试不得在 `$HOME` 留下夹具影子 home。**CI 从不跑 `rehearsal run`** —— 它会装约 500 个包并重放真实会话副本，在共享 runner 上既不确定也不合适；`run` 的安全模型改由离线单测覆盖。
 
-发版由 tag 触发（`.github/workflows/release.yml`）：**tag 不等于 `package.json` 版本就停，`CHANGELOG.md` 里没有对应小节也停**，然后把 tarball 与它的 `.sha256` 附到 Release、用 CHANGELOG 那一节当说明。npm 发布走 `publish.yml`，没有 `NPM_TOKEN` 时自我跳过而不是报错。
+发版由 tag 触发（`.github/workflows/release.yml`）：**tag 不等于 `package.json` 版本就停，两份 CHANGELOG 里缺任一对应小节也停**，然后把 tarball 与它的 `.sha256` 附到 Release、正文按体例生成（中文小节 → 安装 → `---` → 英文小节）。npm 发布走 `publish.yml`，没有 `NPM_TOKEN` 时自我跳过而不是报错。
 
 发布前务必读 [PUBLISHING.md](PUBLISHING.md)：直接推现有历史会公开一个脱敏前的快照（13 处真实路径跨 5 个文件）。仓库已备好一个经过验证的单提交 `publish-clean` 分支专为此用。
 
-版本策略与"哪些主张是在哪一版里被推翻的"见 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog + SemVer；`run --to <版本>` 里的版本号是**被测 dsh 的**，与本工具自己的版本无关）。哪些承诺由代码和测试兜住、哪两个旗标是操作者自己的责任，见 [SECURITY.md](SECURITY.md)。发布与目录收录的现实（包括**为什么不该**提交到插件目录）见 [PUBLISHING.md](PUBLISHING.md)。
+版本策略与"哪些主张是在哪一版里被推翻的"见 [CHANGELOG.zh.md](CHANGELOG.zh.md)（中文，Keep a Changelog + SemVer；[CHANGELOG.md](CHANGELOG.md) 是英文版，两份必须一一对应，`test/changelog.test.js` 断言这件事）。注意 `run --to <版本>` 里的版本号是**被测 dsh 的**，与本工具自己的版本无关。哪些承诺由代码和测试兜住、哪两个旗标是操作者自己的责任，见 [SECURITY.md](SECURITY.md)。发布与目录收录的现实（包括**为什么不该**提交到插件目录）见 [PUBLISHING.md](PUBLISHING.md)。
 
 ---
 
