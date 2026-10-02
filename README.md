@@ -235,6 +235,8 @@ CI 跑 `npm ci` + `npm test`，矩阵为 **windows / macOS / linux × Node 22.19
 
 发布前务必读 [PUBLISHING.md](PUBLISHING.md)：直接推现有历史会公开一个脱敏前的快照（13 处真实路径跨 5 个文件）。仓库已备好一个经过验证的单提交 `publish-clean` 分支专为此用。
 
+版本策略与"哪些主张是在哪一版里被推翻的"见 [CHANGELOG.md](CHANGELOG.md)（Keep a Changelog + SemVer；`run --to <版本>` 里的版本号是**被测 dsh 的**，与本工具自己的版本无关）。哪些承诺由代码和测试兜住、哪两个旗标是操作者自己的责任，见 [SECURITY.md](SECURITY.md)。发布与目录收录的现实（包括**为什么不该**提交到插件目录）见 [PUBLISHING.md](PUBLISHING.md)。
+
 ---
 
 MIT License。与 DeepSeek 无关联、未获其背书。`dsh` / DeepSeek Harness 上游在 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)；桌面壳与活跃缺陷跟踪在 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。

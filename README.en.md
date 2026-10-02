@@ -238,6 +238,8 @@ Releases are tag-triggered (`.github/workflows/release.yml`): **the job stops if
 
 Before publishing, read [PUBLISHING.md](PUBLISHING.md): pushing this history as-is would publish a pre-scrub snapshot (13 real paths across 5 files). The repo ships a verified single-commit `publish-clean` branch for exactly that.
 
+Versioning policy, including which claims were retracted in which release, is in [CHANGELOG.md](CHANGELOG.md) (Keep a Changelog + SemVer; the version in `run --to <version>` is the **dsh under test**, unrelated to this tool's own number). What is enforced by code and tests, versus the two flags that are the operator's responsibility, is in [SECURITY.md](SECURITY.md). Publishing and catalog reality — including **why this should not be submitted** to the plugin directory — is in [PUBLISHING.md](PUBLISHING.md).
+
 ---
 
 MIT License. Not affiliated with or endorsed by DeepSeek. `dsh` / DeepSeek Harness is upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness); the Desktop host and the active issue tracker are [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).
