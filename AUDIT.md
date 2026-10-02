@@ -1,5 +1,7 @@
 # dsh-rehearsal 代码检查与安全测试报告
 
+[简体中文](AUDIT.md) | [English](AUDIT.en.md)
+
 - **日期**：2026-10-02
 - **对象**：`<repo>/dsh_rehearsal`（git `7c374bc`，工作树干净）
 - **规模**：1896 行（src 1611 / test 285，见下表），唯一运行时依赖 `semver@^7.7.3`
@@ -194,7 +196,7 @@ README 红线 #1（"只用自己 npm 装的候选二进制"）已被执行。
 | **P2-7** | `shadow.js:136-141` | 从用户会话提取的 provider/model id 不加引号拼进 YAML | 含 `:` `#` `{` 的 id 会产出坏 YAML，导致 activation 失败被误判成不兼容。修：`JSON.stringify(v)` |
 | **P2-8** | `shadow.js:76` | 候选安装未加 `--ignore-scripts` | ~500 个包的 postinstall 在用户机上直接跑（`allowBuilds` 在真实 profile 里是显式白名单，这里等于绕过该策略）。修：默认 `--ignore-scripts`，需要构建时显式开 |
 | **P2-9** | `sessions.js:23` | `GEN_RE` 只认 `.zstd` | 本机 0 个非压缩会话文件（实测），但官方 `generationLogFilename(version, compression)` 说明两种形态并存 → 潜在漏检。修：`(?:\.zstd)?` |
-| **P2-10** | `zfstd.js:61` | memo key `start*4294967296+end` 超过 `MAX_SAFE_INTEGER` | 实测 3.7 MB → `1.59e16 > 9.007e15`；阈值约 2.1 MB。注释里引用的 3,776,880 B 文件已在阈值之上 → `failed` 集合开始丢精度、相邻键并格，回溯判定可能失真。修：`` `${start}:${end}` `` 或 Map-of-Sets |
+| **P2-10** | `zfstd.js:61` | memo key `start*4294967296+end` 超过 `MAX_SAFE_INTEGER` | 实测 3.78 MB（3,776,880 B）→ `1.59e16 > 9.007e15`；阈值约 2.1 MB。注释里引用的 3,776,880 B 文件已在阈值之上 → `failed` 集合开始丢精度、相邻键并格，回溯判定可能失真。修：`` `${start}:${end}` `` 或 Map-of-Sets |
 | **P2-11** | `shadow.js:171-188` | `patchAdoptionGate` 修改被测对象自身代码（`dsh-headless/lib/index.js` 注入 `return void 0`） | 已标注为格式级结论，可接受。备份 `*.rehearsal-orig` 留在 prefix 内；prefix 非 `--keep` 时随整目录删除，无残留 —— 已核。建议把该事实从 README 提升到 `check`/`run` 的 stdout 横幅，避免被当作原生候选运行 |
 | **P2-12** | `run.js:47` | `sample: opts.sample ?? 20` 中 `opts.sample` 是字符串 | 当前依赖 `slice(0,'20')` 的隐式转换才得到正确结果。修：`Number(...)` 并校验为正整数 |
 

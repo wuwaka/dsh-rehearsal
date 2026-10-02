@@ -13,6 +13,8 @@ const PAIRS = [
   ['CHANGELOG.zh.md', 'CHANGELOG.md'],
   ['SECURITY.md', 'SECURITY.en.md'],
   ['PUBLISHING.md', 'PUBLISHING.en.md'],
+  ['AUDIT.md', 'AUDIT.en.md'],
+  ['FIXES.md', 'FIXES.en.md'],
   [path.join('docs', 'FAILURE_MODES.md'), path.join('docs', 'FAILURE_MODES.en.md')],
 ];
 
@@ -69,13 +71,26 @@ test('pairs reference the same upstream issues', () => {
   }
 });
 
+test('pairs cite the same commit hashes', () => {
+  // audit claims point at specific commits; a half-translated hash list silently
+  // breaks the ability to re-verify them
+  const hashes = (t) => [...new Set([...t.matchAll(/\b[0-9a-f]{7,9}\b/g)].map((m) => m[0]))].sort();
+  for (const [zh, en] of PAIRS) {
+    const a = hashes(read(zh));
+    if (!a.length) continue;
+    assert.deepEqual(a, hashes(read(en)), `${zh} / ${en} disagree on commit hashes`);
+  }
+});
+
 test('no document regressed into first-person prose', () => {
-  const files = ['README.md', 'SECURITY.md', 'PUBLISHING.md', 'CHANGELOG.zh.md', path.join('docs', 'FAILURE_MODES.md')];
-  for (const f of files) {
-    const hits = read(f).split(/\r?\n/).filter((l) => /(我们|我[^的]|^我|我是)/.test(l) && !/^\s*[>｜|]/.test(l));
+  // zero tolerance on 我: quoting a third party who spoke in the first person would
+  // need an explicit exception here rather than a silent relaxation of the rule
+  const zh = ['README.md', 'SECURITY.md', 'PUBLISHING.md', 'CHANGELOG.zh.md', 'AUDIT.md', 'FIXES.md', path.join('docs', 'FAILURE_MODES.md')];
+  for (const f of zh) {
+    const hits = read(f).split(/\r?\n/).filter((l) => /我/.test(l));
     assert.deepEqual(hits, [], `${f} contains first-person narration`);
   }
-  const en = ['README.en.md', 'SECURITY.en.md', 'PUBLISHING.en.md', 'CHANGELOG.md', path.join('docs', 'FAILURE_MODES.en.md')];
+  const en = ['README.en.md', 'SECURITY.en.md', 'PUBLISHING.en.md', 'CHANGELOG.md', 'AUDIT.en.md', 'FIXES.en.md', path.join('docs', 'FAILURE_MODES.en.md')];
   for (const f of en) {
     // case-sensitive: /\bi\b/i would fire on "i.e." and flag prose that has no actor
     assert.equal(/\bI\b|\b(we|our|us)\b/.test(read(f)), false, `${f} contains first-person narration`);
