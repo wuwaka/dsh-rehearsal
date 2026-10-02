@@ -11,7 +11,7 @@ import path from 'node:path';
 import { decodeLines, decodeAll, magicOffsets } from './zfstd.js';
 import { run, shadowEnv } from './util.js';
 
-const WRITE_FAIL_SIGNATURES = [
+export const WRITE_FAIL_SIGNATURES = [
   {
     id: 'v4-producer-source-kind',
     pattern: /format v4 message requires a producer-owned source kind/i,

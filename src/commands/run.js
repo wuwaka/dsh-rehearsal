@@ -17,7 +17,7 @@ import { decodeAll } from '../lib/zfstd.js';
 import { newReport, addStage, finalize, toMarkdown } from '../lib/report.js';
 import { stageTimer } from '../lib/util.js';
 
-const BOOT_SIGNATURES = [
+export const BOOT_SIGNATURES = [
   { id: 'patch-entry-not-found', pattern: /patch:\s*entry\s*"[^"]+"\s*not found/i, note: 'upstream #1294 class: a patch row targets a missing entry (also seen as transient jitter — hence two cold boots)' },
   { id: 'port-in-use', pattern: /EADDRINUSE/i, note: 'address already in use' },
   { id: 'module-missing', pattern: /Cannot find module/i, note: 'broken install or native module issue' },

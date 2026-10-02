@@ -1,0 +1,113 @@
+name: Bug report
+description: A wrong verdict, a crash, or a leak in dsh-rehearsal itself
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **A report file is derived from your own session history.** Scrubbing is
+        best-effort, so paste only the fields named below - never a whole
+        `report.json`, never a `report.md`, and never anything containing session
+        content or paths you did not write yourself. If you believe you found a
+        leak, open a [private security advisory](https://github.com/wuwaka/dsh-rehearsal/security/advisories/new)
+        instead of an issue.
+
+  - type: input
+    id: tool-version
+    attributes:
+      label: dsh-rehearsal version
+      description: "`dsh-rehearsal --version`"
+      placeholder: "dsh-rehearsal 0.2.0 (node v22.19.0)"
+    validations:
+      required: true
+
+  - type: input
+    id: candidate
+    attributes:
+      label: Candidate dsh version
+      description: "the version passed to `run --to` / `check --candidate`"
+      placeholder: "0.2.0-rc.2"
+    validations:
+      required: true
+
+  - type: input
+    id: current
+    attributes:
+      label: Detected current dsh version
+      description: "the `current` field in the report, or the `--current` you passed"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: command
+    attributes:
+      label: Command
+      options: [check, run, clean, other]
+    validations:
+      required: true
+
+  - type: textarea
+    id: flags
+    attributes:
+      label: Full command line, minus your home directory
+      description: "e.g. `node src/cli.js run --to 0.2.0-rc.2 --sample 9 --preset-mode patch`"
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: |
+        Include the exit code and the stage `verdict`s (one line per stage is
+        enough). Paste `details` strings only if they are already redacted.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: OS and Node version
+      placeholder: "Windows 11 26200 / Node 22.22.2"
+    validations:
+      required: true
+
+  - type: textarea
+    id: coverage
+    attributes:
+      label: The report's coverage block
+      description: |
+        Copy `report.coverage` verbatim - it holds only counts, session ids and
+        tool names, and it is what makes a verdict reproducible. Nothing else
+        from the report.
+      render: json
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before submitting
+      options:
+        - label: "I pasted no message bodies, no reasoning text, and no file paths that are not my own"
+          required: true
+        - label: "I pasted no `report.md` and no whole `report.json`"
+          required: true
+        - label: "I ran this on a machine I control, and I understand `--allow-tools` executes recorded tool calls"
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. If your complaint is "the tool told me PASS and my upgrade broke
+        anyway", say so plainly and include the candidate version and the coverage
+        block: that is a claim about *coverage*, and the coverage numbers are the
+        part of this project that is meant to be falsifiable.

@@ -24,7 +24,7 @@ git commit -m "dsh-rehearsal 0.1.0: static upgrade pre-flight + keyless session 
 git diff --stat main publish-clean          # must print nothing (identical tree)
 git ls-tree -r --name-only publish-clean    # no .dsh-rehearsal/, no node_modules/, no fixtures
 git grep -nE "<TOKENS>" publish-clean --    # your own username / drive layout; expect no output
-npm test                                    # 52/52
+npm test                                    # 57/57
 git remote add origin https://github.com/<you>/dsh-rehearsal.git
 git push origin publish-clean:main
 ```
@@ -59,23 +59,82 @@ out of the repo.
 
    The name `dsh-rehearsal` was still unclaimed on 2026-10-02; the community has a habit of
    reserving names without publishing, so claim it when you are actually ready.
-2. Set the GitHub topic `dsh-plugin` so directory scrapers find it:
-   `gh api repos/<you>/dsh-rehearsal -f "topics[]=dsh-plugin" -X PUT` (topics need the
-   `repo` scope).
-3. Submit to the community catalog: one file per plugin at
-   `data/plugins/<owner>__<repo>.yml` (`.yml`, not `.yaml`), one pull request, CI-gated —
-   <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin>.
-4. Only then add the registry badges (npm version/downloads, dshfind, marketplace) to the README.
-   Do not pre-add them: they 404 until listed, and a badge that resolves to nothing is worse than
-   no badge.
+2. **Set topics.** `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`
+   (topics need the `repo` scope). Add `dsh-plugin` only as a **search affordance** —
+   this repository is deliberately not a `dsh plugin add` bundle, and the README's
+   header line says so. Do not let a topic become an install claim.
+
+3. **Do not submit to `awesome-dsh-plugin/awesome-dsh-plugin`.** Verified 2026-10-02:
+   its `scripts/check-submission.mjs:258-264` requires some `package.json` in the repo to
+   declare `dsh.bundle`, and a repo declaring only `dsh.client` is refused with
+   "that alone is not installable". `dsh-plugin-reducer` and `dsh-canary` — both external
+   CLIs, like this — return 0 hits in its generated list (4,412 entries). Submission would
+   burn a CI-gated PR and be rejected on a rule that is correct: being listed there implies
+   installability this tool intentionally does not have.
+
+   Descriptor keys there are whitelisted (`scripts/lib/entries.mjs:136`:
+   `url, name, category, description, tarball, file`; unknown keys fail CI), and an optional
+   `tarball` must be an https GitHub-release-hosted URL ending in `.tgz` — which is why
+   `release.yml` attaches exactly that.
+
+   Where listing *is* appropriate:
+   - `walkinglabs/awesome-deepseek-harness-plugins` → `docs/INCLUSION_POLICY.md` rule 4:
+     "It is a client, launcher, or development resource … placed outside the plugin
+     categories and labelled accordingly."
+   - `awesome-deepseekharness/awesome-deepseek-harness` → `CONTRIBUTING.md`, category
+     `🧩 Tools, Workflows & Presets`; it wants `README.md` (English) **and** `README.zh.md`
+     entries at the same position, and its example PR title is
+     `Add owner/repo to Category`.
+
+   Neither has been submitted as of 2026-10-02.
+
+4. **Only then add registry badges** (npm version/downloads, dshfind, marketplace). Do not
+   pre-add them: they 404 until listed, and a badge that resolves to nothing is worse than
+   no badge. The `dsh-doctor` gate badge is **not applicable** here — its R/K/D gates score
+   `dsh.bundle` packages, and this repository has none.
+
 5. Re-check the CI badge in the README header resolves once the first workflow run is green:
    `gh run list --repo <you>/dsh-rehearsal`.
 
-## Two claims in the README depend on measurement
+## Cutting a release
+
+`release.yml` runs on a `v*` tag push and **refuses** in two cases, so the order matters:
+
+```sh
+npm test                                     # must be green, 57/57
+# 1. CHANGELOG.md: move Unreleased content under a new "## [X.Y.Z] - YYYY-MM-DD" heading,
+#    add the [X.Y.Z] link at the bottom, and update the [Unreleased] compare range.
+# 2. package.json: "version" must equal X.Y.Z exactly.
+node scripts/changelog-section.mjs vX.Y.Z    # prints what the Release body will be
+git add -A && git commit -m "…"
+git tag -a "vX.Y.Z" -m "vX.Y.Z"
+git push origin publish-clean:main           # CI green first
+git push origin "vX.Y.Z"                     # triggers the Release job
+```
+
+Then verify the release actually carries what it claims:
+
+```sh
+gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
+  --json tagName,prerelease,assets --jq '{tagName,prerelease,assets:[.assets[].name]}'
+# expect: dsh-rehearsal-X.Y.Z.tgz + dsh-rehearsal-X.Y.Z.tgz.sha256
+```
+
+A tag containing `-` (e.g. `v0.3.0-rc.1`) is marked `--prerelease` automatically, and
+`publish.yml` will still try to npm-publish it — pass `--tag next` if a prerelease must not
+take the `latest` dist-tag. Never commit `*.tgz` or `SHA256SUMS.txt`; `.gitignore` covers
+both, because a checksum committed next to a *different* tarball than the tag points at is
+worse than no checksum.
+
+## Three claims in the README depend on measurement
 
 Keep them honest as releases move:
 
-- the **compatibility table** names the candidate version verified and the date. Re-verify per
-  release, or the table silently becomes fiction;
-- the **coverage table** (drillable share and allowlist-pass share) is measured on one machine. If
-  you republish it, re-measure; do not average it across users or present it as typical.
+- the **compatibility table** separates tested from declared and names the verification
+  date. Re-verify per release, or the table silently becomes fiction;
+- the **coverage table** (drillable share and allowlist-pass share) is measured on one
+  machine. If you republish it, re-measure; do not average it across users or present it as
+  typical;
+- the **prior-art table** describes other people's repositories, which change without
+  telling you. Re-read their source before repeating any cell — a wrong claim about a
+  competitor is the failure mode this section exists to avoid.

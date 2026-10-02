@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report (including anything that leaked into a report)
+    url: https://github.com/wuwaka/dsh-rehearsal/security/advisories/new
+    about: Private advisory. Do not open a public issue containing report output.
+  - name: What this tool promises, in code
+    url: https://github.com/wuwaka/dsh-rehearsal/blob/main/SECURITY.md
+    about: The guarantees that are enforced and tested, and the two red lines that are yours.

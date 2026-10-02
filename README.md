@@ -13,7 +13,7 @@
 [![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe?style=flat-square)](https://github.com/topics/dsh-plugin)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
-*独立命令行工具。不是 `dsh plugin add` 的 bundle，也刻意不去做第四个"单插件 canary"。*
+*独立命令行工具，不是 `dsh plugin add` 的 bundle —— 也不是又一个"单插件冒烟器"。*
 
 </div>
 
@@ -30,20 +30,40 @@
 
 产出 `dsh-rehearsal/v1` 报告（`report.json` + `report.md`），退出码可直接接进脚本：`0` 可升 · `1` 带条件可升 · `2` 不可升 · `3` 彩排自身失败。
 
-装法（已实测可用，无需 npm 注册）：
+装法（按 tag 装，**无需 npm 账号**；该形式在 0.1.0 上实测通过，把 tag 换成你要装的版本即可）：
 
 ```sh
-npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
 dsh-rehearsal check --candidate 0.2.0-rc.2
+```
+
+想要可复核到字节的安装，用 Release 里附带的 tarball 与它的 `.sha256`：
+
+```sh
+curl -sSLO https://github.com/wuwaka/dsh-rehearsal/releases/download/v0.2.0/dsh-rehearsal-0.2.0.tgz
+curl -sSL -O https://github.com/wuwaka/dsh-rehearsal/releases/download/v0.2.0/dsh-rehearsal-0.2.0.tgz.sha256
+sha256sum -c dsh-rehearsal-0.2.0.tgz.sha256
+npm install -g ./dsh-rehearsal-0.2.0.tgz
 ```
 
 ## 为什么是外部 CLI，而不是插件
 
-一个装在待测 profile 里的彩排工具，**会恰好在最需要它的时候一起死掉**。这个工具立项所依据的上游报告就是这个形状：[`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294) 里 `host-boot` 卡到 120 秒 RPC 超时、进恢复模式，**日志里没有任何插件级定位信息**，而提报告的人同时发现**完全相同的配置第二次启动就正常**。
+"一个装在待测 profile 里的彩排工具，会恰好在最需要它的时候一起死掉" —— 这句话**不是我们说的**，是 [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) 自己写在 README 里的：`README.zh.md:282`「**起不来的控制台什么都门控不了** —— 所以这条救火链路永远生效」。同一个动机还有两条独立实现：`@xiaoyuyu6420/dsh-backup` 附带零依赖的 `dsh-rescue`（package.json `bin`，"宿主起不来也能用的救援通道"），`zzy6-a/dsh-upgrade-guard` 用宿主外 supervisor 回滚宿主版本。
 
-所以 `dsh-rehearsal` 把候选 `dsh` 当作**自己家目录里的子进程**来驱动，从宿主外面向内看：
+**所以"外部"是入场券，不是卖点。** 这个生态里已经有好几个从宿主外面跑的 CLI（`dsh-plugin-reducer` 每次探测新建影子 `DSH_HOME`、`@mars.liu/dsh-canary` 直接驱动你的 dsh）。`dsh-rehearsal` 占的位置是这四件事**同时**成立 —— 2026-10-02 逐个读源码核对：
 
-- 不碰、也碰不到你的活 profile —— 候选由它自己 npm 安装，`DSH_HOME` 指向私有目录；
+| 条件 | 别人的现状 |
+|---|---|
+| 装**候选核心版本**，且装进自己的私有前缀 | `dsh-canary` 的 L1 能钉 dsh 版本，但复用你 profile 现有的 `node_modules`；`@linxin666/dsh-doctor` 救援舱用隔离 `DSH_HOME` 跑候选门再原子 promote，但它钉的是**当前**版本（为了恢复，不是为了预演） |
+| 开的是**你的历史会话** | 只有 `dsh-backup` 读你的会话日志，而它 `lib/index.js:512` 自己声明"只读扫描，不写任何文件" |
+| 迁移发生在**已经启动的**影子宿主里 | 读会话的没有启动宿主，启动宿主的没有读会话 |
+| 写回合**不需要 API 键** | `dsh-test-drive` 的 `capability` 阶段确实真的跑一个 headless 任务，并核对持久会话日志记下了这次调用 —— 但那一步需要 `DEEPSEEK_API_KEY`，无键时判 `skipped`（它的 README 明说 "skipped, never failed"） |
+
+最后一行是可以自查的：`gh search code "@deepseek-ai/dsh-llm-replay"` 在 2026-10-02 只命中官方仓 `deepseek-ai/deepseek-harness` 本身、其 fork 与 vendored 文档，**没有任何第三方工具消费这个包**。本工具的写回合就建在它上面。
+
+具体执行形态：候选 `dsh` 是它**自己 npm 装进私有前缀的子进程**，`DSH_HOME` 指向私有目录 ——
+
+- 碰不到你的活 profile；
 - 已装的 harness 起不来时它照样能跑；
 - 每条结论都对应磁盘上一个产物（`report.json`），而不是靠人眼读日志。
 
@@ -51,18 +71,18 @@ dsh-rehearsal check --candidate 0.2.0-rc.2
 
 ## 兼容性
 
-2026-10-02 在真实机器上验证：
+**声明范围 ≠ 实测版本** —— 下表把两者分列，因为对一个"要不要升"的决策工具来说，测试环境的时效本身就是风险。
 
-| 组件 | 版本 |
-|---|---|
-| 候选 `dsh`（由本工具装进私有前缀） | **`0.2.0-rc.2`** —— `--sample 9 --preset-mode patch`：9/9 个真实会话完成 v0→v4 迁移，1 次无键写回合 `pass` |
-| 当前运行时探测 | 依次探 profile 的 `node_modules`、共享 `profiles/node_modules`、**DSH Desktop** 内置体（`…/resources/app/node_modules/@deepseek-ai/dsh`）、npm 前缀 |
-| 会话格式代际 | `v0`（`session.jsonl.zstd`）、`v3`、`v4`；迁移链 `v0→…→v4` 已对真实日志跑通 |
-| Node.js | `>=22.19`（需要 `node:zlib` 的 zstd，v22.15.0 引入，仍标 *Stability: 1 – Experimental*） |
-| 包管理器 | `npm`（不依赖 `PATH` 语义定位，只用来装候选，绝不装你的 profile） |
-| 平台 | Windows / macOS / Linux —— CI 矩阵 `3 OS × Node 22.19, 24.x` |
-| 运行时依赖 | **只有 1 个**：`semver` |
-| 凭据 | **任何阶段都不需要** —— 见[构造即安全](#构造即安全) |
+| 组件 | 实测 | 声明 / 未验证 |
+|---|---|---|
+| 候选 `dsh` | **`0.2.0-rc.2`**，`--sample 9 --preset-mode patch`：9/9 个真实会话完成 `v0→v4` 迁移，1 次无键写回合 `pass`（**2026-10-02**，单机） | 更早的 rc / 稳定版未彩排过；`check` 是纯文件解析，不装任何东西 |
+| 当前运行时探测 | 依次探 profile 的 `node_modules` → 共享 `profiles/node_modules` → **DSH Desktop** 内置体（`…/resources/app/node_modules/@deepseek-ai/dsh`）→ npm 前缀 | Desktop 内置体的 `run` 彩排不支持（见下方设计决定） |
+| 会话格式代际 | `v0`（`session.jsonl.zstd`）、`v3`、`v4`；迁移链 `v0→…→v4` 已对**真实日志**跑通 | `v1`/`v2` 只有代际识别，没有真机样本 |
+| Node.js | 本机 **22.22.2**（RStudio 内嵌）；CI **22.19 与 24.x** 六组合全绿（`24.x` 那条腿**只有 CI 验过**） | `engines.node: >=22.19` —— 需要 `node:zlib` 的 zstd（v22.15.0 引入，仍标 *Stability: 1 – Experimental*） |
+| 平台 | Windows 真机端到端；macOS / Linux 只有 CI（只跑 `npm test`，不跑 `run`） | `run` 在非 Windows 未做过真机会话彩排 |
+| 包管理器 | `npm` —— 不靠 `PATH` 语义定位，只用来把候选装进私有前缀 | 不装你的 profile，也不碰 pnpm |
+| 运行时依赖 | **只有 1 个**：`semver` | — |
+| 凭据 | **任何阶段都不需要** —— 见[构造即安全](#构造即安全) | — |
 
 **不支持（且是设计决定）：** 通过 npm CLI 彩排 Electron 拥有的 `desktop` profile。`dsh` 直接硬拒（`profile "desktop" is managed exclusively by the Electron application`），而且 npm 装的候选与 Desktop 内置体是**两套不同的依赖闭包**。`check` 仍可覆盖 `desktop` profile —— 它只解析文件。`run` 面向 npm / 自托管的 `web`、`headless` profile。
 
@@ -124,24 +144,36 @@ dsh-rehearsal check --candidate 0.2.0-rc.2
 
 ## 与已有同类工具的差别
 
-这个生态并不空，装作空是在浪费你的时间 —— 所以明说：
+这个生态并不空，装作空是在浪费你的时间。下表每一格都在 2026-10-02 读过对方源码或原文，并给出可自查的出处 —— 把别人的工具写错，比把自己的工具写小更糟。
 
-| 工具 | 它做什么 | 本工具补什么 |
+| 工具 | 它做到哪一步（已核对） | 本工具补什么 |
 |---|---|---|
-| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | profile 内的升级门控：契约预检、回滚点、失败自动回滚、隔离拖垮启动的插件 | 从宿主外面跑，在你还没装任何东西之前，并且能针对你**尚未采用**的候选版本给归因 |
-| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) · [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | 一次性 profile 里对**某个插件**做安装+启动冒烟，结构化 `v1` 报告，GitHub Action | 彩排**核心版本**，带你整套钉死的插件集，并且对**你的**会话副本动手 |
-| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check`：升级前静态扫全部会话，预测哪些会被新宿主拒绝；另附救援控制台 | 在迁移后的副本上真的**打开并写一轮** —— 那是所有读侧检查都会放过的损坏类 |
-| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | 包结构门禁、cordis 契约扫描、无键无头冒烟 | 跨版本聚合与 go/no-go 结论，而不是单插件健康检查 |
-| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | 外部 CLI，把 profile 归约到能复现故障的最小插件集 | 面向未来（升级前）而不是事后（故障后）；互补关系 |
+| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | 升级前契约预检 → 配置备份 + 全树回滚点 → **一键执行框架升级**、失败自动回滚；「启动失败隔离」= 从启动日志**点名**定位肇事插件后禁用（预设改名 `.broken-*`），找不到明确肇事者才进安全模式；环境指纹连"别的通道改了框架"也守 | 它跑在 profile 内，且预检是**契约集合差分**（`lib/server/domain/format-contract.js:4-7`）。它的 `CHANGELOG.md:875` 自己列了未验证项：「**没有**跑一次带预设的会话（那需要新建会话 + **真实模型调用**）」—— 本工具做的正是去掉"真实模型调用"这一条 |
+| [`@linxin666/dsh-doctor` 救援舱](https://github.com/zhu1090093659/dsh-web) | 固定 DSH 运行时 + 隔离 `DSH_HOME`，对候选跑隔离 `dump-config` 与 Web 健康门，通过才 promote，失败按字节回滚 —— 形态上最接近"影子宿主 + 候选门 + 原子提升" | 门的是装载器/配置面。其发布 tarball 的 node 侧代码 grep 不到任何 `session` / `sessions/` 引用；"pinned" 钉的是**当前**版本（为了恢复），不是候选 |
+| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) | 装 → patch 生效 → 冷启动 → 卸 → 清理，全程 `mkdtemp` 影子 `DSH_HOME` + 独立 pnpm store；`schema: "dsh-test-drive/v1"`；`action.yml` 出 Markdown(PR comment) + JUnit XML。可选 `capability` 阶段真的驱动一个 headless 任务并核对**持久会话日志记下了这次调用** | 那一步需要 `DEEPSEEK_API_KEY`，无键时 `skipped`（README 原文 "skipped, never failed"），且开的是**新建**会话。本工具的写回合无键，对象是**你的 v0→v4 历史副本** |
+| [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | 独立 npm CLI，真的 boot 一个「你 profile 的 bundle 集 + 候选插件」的一次性组合（`profiles/canary-<rand>`，绝对符号链接复用 `node_modules`），L1 可钉 dsh 版本 | 换的是**插件**；会话数据不在射程内。没有 GitHub Action，也没有 `v1` schema 判别字段 |
+| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check` **只读**静态扫全部代会话日志（`lib/index.js:512` "不写任何文件"），按代际冻结清单预测哪些会话打不开、挂在哪条规则；另有零依赖 `dsh-rescue` 进程外救援 | 见下面的引用 —— 难点不是"它没想到"，是**读侧结构上判不出来** |
+| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | 包结构 R/K 门禁 + cordis 契约扫描 + 无键无头冒烟（`MISSING_CREDENTIAL` 判为通过）；`coverage.<K>{filesInspected,mode}` + `degraded[]` + exit `6`，规范写着「a `skip` is never rendered as `PASS`」 | 近亲而非竞品：本工具的 `coverage` + `warnings[]` 是同一族纪律，差别只在把结论聚合到"能不能升" |
+| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | 外部 CLI，每次探测新建影子 `DSH_HOME` 并把 profile 链到现有 `node_modules`（**不安装任何东西**），把故障 profile 归约到最小可复现插件集；另有 weekly `upstream-canary.yml` 探 `dsh-app-boot@next` 的布局漂移 | 它是**事后**归约（已有故障 → 最小复现集），本工具在升级**之前**；它的 canary 探的是上游布局漂移，不是你的会话 |
+
+**"读侧判不出来"这件事，由对手自己的代码注释作证。** `dsh-backup` 一度把 `source.kind` 不在白名单直接判成"打不开"，线上结果是：
+
+> `kind 只作提示，不作判据（#113）：宿主把它设计成可合并扩展的联合类型……旧实现把"不在白名单"直接判成"打不开"，在一台真实机器上把 **81/82 份完全健康的日志**报成不可打开`
+> —— `xiaoyuyu6420/dsh-backup` `lib/index.js:2617-2622`
+
+同一类损坏，`gating-hub` 的应对是**改写生产方源码**（契约规则 `session-message-source-kind`：把仍在写 V3 `{kind:'plugin'}` 包装的插件改成 producer-owned kind）。也就是说：静态扫描判不准（会误伤 81/82），契约差分修的是代码不是数据 —— 而上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) 那份会话是"**打开正常、每个回合必炸**"。只有真的写一轮才判得出来，而"写一轮"过去必须有 API 键。这就是本工具存在的全部理由。
+
+本工具识别的每一条日志形态、它命中/不命中各能推出什么、以及**本机复现不了的那几条为什么仍然保留**，逐条列在 [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md)。
 
 ## 快速开始
 
 ```sh
-# 安装（已实测：无需 npm 注册，走 GitHub tag）
-npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+# 安装（按 tag，无需 npm 注册）
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
 
+dsh-rehearsal --version                               # 确认可执行文件真的装上了
 dsh-rehearsal check --candidate 0.2.0-rc.2            # 只读体检，秒级
-dsh-rehearsal run --to 0.2.0-rc.2 --sample 20         # 完整彩排（首次要装候选，约 2-5 分钟）
+dsh-rehearsal run --to 0.2.0-rc.2 --sample 20         # 完整彩排（会装候选、会复制你的会话；首次约 2-5 分钟）
 dsh-rehearsal clean --yes                             # 清理 .dsh-rehearsal 产物
 ```
 
@@ -167,8 +199,9 @@ node src/cli.js check --candidate 0.2.0-rc.2
 - 附件旁路数据不复制、不校验（`~/.dsh/attachments`、`cache/attachments`），附件引用完整性明确划在范围外而不是假装测过。
 - npm 影子 ≠ Desktop 安装体：`run` 复现不了 Electron 的依赖闭包（见[兼容性](#兼容性)）。
 - 彩排测的是*写路径可走通*，不是自由行为：replay 脚本派生自该会话自己的录制，录制里没有的工具和路径不会出现。
-- #1229 类毒行检测已内置，但在本机数据上无法触发（`v3→v4` 迁移包自 `0.2.0-rc.1` 起就带 `producerKind` 改写映射）。
+- #1229 类毒行检测已内置，但在本机数据上无法触发（`v3→v4` 迁移包自 `0.2.0-rc.1` 起就带 `producerKind` 改写映射）。每条签名的原文日志、命中处、以及**本机能不能复现**都列在 [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md) 里，不复现的会明写不复现。
 - `run` 目前仍用一个 `--sample` 同时决定迁移样本和写回合候选池；想要更宽的写覆盖就调大它。
+- **本工具不在、也不该在 `awesome-dsh-plugin` 插件目录里**：该目录的 `scripts/check-submission.mjs:258-264` 硬性要求某个 `package.json` 声明 `dsh.bundle`，只声明 `dsh.client` 都不收（`dsh-plugin-reducer`、`dsh-canary` 同样不在目录里，实测 4412 条 0 命中）。它收录的是"能 `dsh plugin add`"的东西，而本工具刻意不是。要索引它，位置在工具类目录 —— `walkinglabs/awesome-deepseek-harness-plugins` 的 `docs/INCLUSION_POLICY.md` 第 4 条（"client、launcher 或开发资源，放在插件类别之外并标注"）与 `awesome-deepseekharness/awesome-deepseek-harness` 的 `CONTRIBUTING.md` 🧩 Tools 类别。
 
 ## 怎么自证"没有污染真实 home"
 
@@ -188,13 +221,17 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## 开发
 
 ```sh
-npm test        # 52 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
+npm test        # 57 个测试：多帧 zstd 回归（裸 zlib 把 1698 行读成 1 行）/ peer 分级 /
                 # 沙箱 cwd 重写 + 目录编码 / stderr 消毒器 / 结构化脱敏 / 只读允许清单 /
                 # env 剔除 / countRows 结构 / 分层采样 / writeRoundVerdict /
-                # warnings 渲染与脱敏 / check 端到端 CLI 冒烟
+                # warnings 渲染与脱敏 / 签名回归锁 / check 端到端 CLI 冒烟
 ```
 
+签名回归锁的形状是**成对**的：每条日志形态必须命中从 issue 正文或真机产物抄来的原文，且必须**不**命中健康行；另有一条断言要求"代码里检测的每个 id 都出现在 [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md) 里"，否则文档会静默腐烂成一个没人复核过的兼容性声明。
+
 CI 跑 `npm ci` + `npm test`，矩阵为 **windows / macOS / linux × Node 22.19 与 24.x**，外加两条护栏断言：本工具依赖的 `node:zlib` zstd API 必须存在；测试不得在 `$HOME` 留下夹具影子 home。**CI 从不跑 `rehearsal run`** —— 它会装约 500 个包并重放真实会话副本，在共享 runner 上既不确定也不合适；`run` 的安全模型改由离线单测覆盖。
+
+发版由 tag 触发（`.github/workflows/release.yml`）：**tag 不等于 `package.json` 版本就停，`CHANGELOG.md` 里没有对应小节也停**，然后把 tarball 与它的 `.sha256` 附到 Release、用 CHANGELOG 那一节当说明。npm 发布走 `publish.yml`，没有 `NPM_TOKEN` 时自我跳过而不是报错。
 
 发布前务必读 [PUBLISHING.md](PUBLISHING.md)：直接推现有历史会公开一个脱敏前的快照（13 处真实路径跨 5 个文件）。仓库已备好一个经过验证的单提交 `publish-clean` 分支专为此用。
 

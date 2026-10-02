@@ -1,0 +1,89 @@
+name: Release
+
+# Tag-driven GitHub Release: guard -> test -> smoke-install -> notes -> assets.
+#
+# Two deliberate refusals, both because a wrong artifact is worse than none:
+#   * the tag must equal package.json's version, or the job stops;
+#   * CHANGELOG.md must carry a section for that version, or the job stops, so
+#     no release ships with an empty "just look at the code" note.
+#
+# The tarball plus its checksum are attached so an install line can be pinned to
+# bytes. Publishing to npm happens in publish.yml, on `release: published`.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      - name: Guard - tag must match package.json version
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "v${pkg}" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version v${pkg}"
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Pack and smoke-install the tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="$(node -p "require('./package.json').name.split('/').pop()")-$(node -p "require('./package.json').version")"
+          npm pack --ignore-scripts > /dev/null
+          tarball="${base}.tgz"
+          [ -f "$tarball" ] || { echo "::error::expected $tarball after npm pack"; exit 1; }
+          prefix="$(mktemp -d)"
+          npm install --global --prefix "$prefix" --no-audit --no-fund "./$tarball" > /dev/null
+          "$prefix/bin/dsh-rehearsal" --version
+          "$prefix/bin/dsh-rehearsal" --help > /dev/null
+          sha256sum "$tarball" > "${tarball}.sha256"
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+          echo "SHAFILE=${tarball}.sha256" >> "$GITHUB_ENV"
+
+      - name: Build release notes from CHANGELOG
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo '```sh'
+            echo "npm install -g github:wuwaka/dsh-rehearsal#${GITHUB_REF_NAME}"
+            echo '```'
+            echo
+            echo "Or pinned to bytes: \`npm install -g https://github.com/wuwaka/dsh-rehearsal/releases/download/${GITHUB_REF_NAME}/${TARBALL}\`"
+            echo "(verify with the attached \`${SHAFILE}\`.)"
+            echo
+            node scripts/changelog-section.mjs "$GITHUB_REF_NAME"
+          } > release-notes.md
+
+      - name: Publish the release with assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pre=()
+          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease) ;; esac
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md ${pre[@]+"${pre[@]}"}
+          fi
+          gh release upload "$GITHUB_REF_NAME" "$TARBALL" "$SHAFILE" --clobber
+          gh release view "$GITHUB_REF_NAME" --json tagName,prerelease,assets \
+            --jq '.tagName + " prerelease=" + (.prerelease|tostring) + " assets=" + ([.assets[].name]|join(","))'

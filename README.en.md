@@ -13,7 +13,7 @@
 [![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe?style=flat-square)](https://github.com/topics/dsh-plugin)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#compatibility)
 
-*A standalone command-line tool. Not a `dsh plugin add` bundle, and deliberately not a fourth single-plugin canary.*
+*A standalone command-line tool, not a `dsh plugin add` bundle — and not another single-plugin smoke tester.*
 
 </div>
 
@@ -30,39 +30,59 @@ Two commands, one decision:
 
 Emits a `dsh-rehearsal/v1` report (`report.json` + `report.md`); exit codes are scriptable: `0` OK · `1` with conditions · `2` do not upgrade · `3` the rehearsal itself failed.
 
-Install (verified working; no npm registry entry needed):
+Install by tag — **no npm account needed** (this form was verified against 0.1.0; substitute the tag you want):
 
 ```sh
-npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
 dsh-rehearsal check --candidate 0.2.0-rc.2
+```
+
+For an install you can verify down to the byte, use the Release assets:
+
+```sh
+curl -sSLO https://github.com/wuwaka/dsh-rehearsal/releases/download/v0.2.0/dsh-rehearsal-0.2.0.tgz
+curl -sSL -O https://github.com/wuwaka/dsh-rehearsal/releases/download/v0.2.0/dsh-rehearsal-0.2.0.tgz.sha256
+sha256sum -c dsh-rehearsal-0.2.0.tgz.sha256
+npm install -g ./dsh-rehearsal-0.2.0.tgz
 ```
 
 ## Why an external CLI, not a plugin
 
-A rehearsal tool that lives inside the profile it is rehearsing **dies exactly when it matters most**. The upstream reports this tool was built from are full of that failure mode: [`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294) is a `host-boot` 120 s RPC timeout that ends in recovery mode with **no plugin-level attribution at all**, and the reporter notes the *identical* configuration booted fine on the second try.
+"A rehearsal tool that lives inside the profile it is rehearsing dies exactly when it matters most" is **not our line** — it is [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub)'s own, at `README.zh.md:282`: 「**起不来的控制台什么都门控不了** —— 所以这条救火链路永远生效」 ("a console that cannot boot cannot gate anything"). The same reasoning already produced two more out-of-process paths: `@xiaoyuyu6420/dsh-backup` ships a zero-dependency `dsh-rescue` bin (its own words: an out-of-process rescue console for when the host will not start), and `zzy6-a/dsh-upgrade-guard` rolls the host back from a supervisor outside it.
 
-So `dsh-rehearsal` drives the candidate `dsh` as a **child process in its own home directory**, from outside the host:
+**So "external" is the entry ticket, not the selling point.** Several tools in this ecosystem already run outside the host (`dsh-plugin-reducer` builds a shadow `DSH_HOME` per probe; `@mars.liu/dsh-canary` drives your own `dsh`). The position `dsh-rehearsal` occupies is these four things holding **at the same time** — each checked against their source on 2026-10-02:
 
-- it never touches your live profile, and cannot — it installs the candidate itself and points `DSH_HOME` at a private directory;
-- it still works when the installed harness will not start;
+| Condition | What everyone else does |
+|---|---|
+| Installs a **candidate core version**, into its own private prefix | `dsh-canary` L1 can pin a `dsh` version but reuses your profile's existing `node_modules`; `@linxin666/dsh-doctor`'s rescue capsule gates a candidate in an isolated `DSH_HOME` and promotes atomically, but pins the **current** version — for recovery, not rehearsal |
+| Opens **your historical sessions** | only `dsh-backup` reads your session logs, and `lib/index.js:512` states its own boundary: "read-only scan, writes nothing" |
+| Migrates inside a host that **actually booted** | the tools that read sessions do not boot a host; the tools that boot a host do not read sessions |
+| Runs a write round **with no API key** | `dsh-test-drive`'s `capability` stage really does drive a headless task and checks the durable session log recorded the call — but it needs `DEEPSEEK_API_KEY`, and without one its README says the stage is "skipped, never failed" |
+
+The last row is checkable by anyone: `gh search code "@deepseek-ai/dsh-llm-replay"` on 2026-10-02 returns only the upstream repo `deepseek-ai/deepseek-harness`, its forks, and vendored docs — **no third-party tool consumes that package**. This tool's write round is built on it.
+
+Mechanically, the candidate `dsh` is a **child process this tool npm-installs into a private prefix**, with `DSH_HOME` pointing at a private directory —
+
+- it cannot reach your live profile;
+- it still runs when the installed harness will not start;
 - every conclusion is backed by an artifact on disk (`report.json`), not by a log you read by eye.
 
 > **Relationship to official gating.** `dsh-plugin-manager` enforces declared peer ranges at *install and startup* and offers exact-version exemptions (`dsh plugin allow-version … --accept-risk`). That is a runtime guardrail. This tool answers the earlier question — *what will break if I move to version X*, including session data that only breaks when something writes to it — and it runs **before** you commit to the upgrade. Complementary, not duplicative.
 
 ## Compatibility
 
-Verified on a real machine, 2026-10-02:
+**A declared range is not a tested version** — this table separates them, because for a tool whose job is to inform an upgrade decision, the staleness of its own test environment is itself a risk.
 
-| Component | Version |
-|---|---|
-| Candidate `dsh` (installed by this tool into a private prefix) | **`0.2.0-rc.2`** — `--sample 9 --preset-mode patch`: 9/9 real sessions migrated v0→v4, 1 keyless write round `pass` |
-| Current runtime detection | probes the profile's `node_modules`, the shared `profiles/node_modules`, the **DSH Desktop** bundle (`…/resources/app/node_modules/@deepseek-ai/dsh`), then the npm prefix |
-| Session format generations | `v0` (`session.jsonl.zstd`), `v3`, `v4`; migration chain `v0→…→v4` exercised against real logs |
-| Node.js | `>=22.19` (needs `node:zlib` zstd, added in v22.15.0, still *Stability: 1 – Experimental*) |
-| Package manager | `npm` (located without `PATH` assumptions; used to install the candidate, never your profile) |
-| Platform | Windows / macOS / Linux — CI matrix `3 OS × Node 22.19, 24.x` |
-| Runtime dependencies | **one**: `semver` |
-| Credentials | **none required, ever** — see [Safety by construction](#safety-by-construction) |
+| Component | Tested | Declared / not verified |
+|---|---|---|
+| Candidate `dsh` | **`0.2.0-rc.2`**, `--sample 9 --preset-mode patch`: 9/9 real sessions completed `v0→v4`, 1 keyless write round `pass` (**2026-10-02**, one machine) | earlier rcs and stable were never rehearsed; `check` is pure file parsing and installs nothing |
+| Current runtime detection | probes the profile's `node_modules` → shared `profiles/node_modules` → the **DSH Desktop** bundle (`…/resources/app/node_modules/@deepseek-ai/dsh`) → the npm prefix | `run` against a Desktop-internal candidate is unsupported (design decision below) |
+| Session generations | `v0` (`session.jsonl.zstd`), `v3`, `v4`; the `v0→…→v4` chain exercised against **real logs** | `v1`/`v2` have generation detection only — no real-world sample |
+| Node.js | local **22.22.2**; CI **22.19 and 24.x**, six combinations green (the `24.x` leg is **CI-only**) | `engines.node: >=22.19` — needs `node:zlib` zstd (added v22.15.0, still *Stability: 1 – Experimental*) |
+| Platform | end-to-end on real Windows; macOS / Linux run `npm test` only — CI never executes `run` | `run` has never rehearsed real sessions on macOS or Linux |
+| Package manager | `npm` — located without `PATH` assumptions, used only to install the candidate into a private prefix | never installs into your profile, and does not require pnpm |
+| Runtime dependencies | **one**: `semver` | — |
+| Credentials | **none required, ever** — see [Safety by construction](#safety-by-construction) | — |
 
 **Not supported (by design):** rehearsing the Electron-owned `desktop` profile through the npm CLI. `dsh` hard-refuses it (`profile "desktop" is managed exclusively by the Electron application`), and an npm-installed candidate is a *different dependency closure* than the Desktop bundle. `check` still covers a `desktop` profile — it only parses files. `run` targets npm / self-hosted `web` and `headless` profiles.
 
@@ -124,24 +144,36 @@ Preset-carrying sessions deserve their own note: the one-shot runner refuses the
 
 ## How this differs from what already exists
 
-The ecosystem is not empty, and pretending otherwise would waste your time — so, explicitly:
+The ecosystem is not empty, and pretending otherwise would waste your time. Every cell below was checked against the other project's source or its own README on 2026-10-02, with a citation you can verify — misdescribing someone else's tool is a worse failure than underselling your own.
 
-| Tool | What it does | What this adds |
+| Tool | How far it goes (verified) | What this adds |
 |---|---|---|
-| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | in-profile upgrade gate: contract pre-check, rollback point, auto-rollback, quarantines the plugin that broke boot | runs from outside, before you install anything, and can attribute a candidate version you have not adopted yet |
-| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) · [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | throwaway-profile install + boot smoke for **a plugin**, structured `v1` report, GitHub Action | rehearses the **core** version, with your whole pinned plugin set, against copies of **your** sessions |
-| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check`: static pre-upgrade scan predicting which sessions the new host will refuse, plus rescue console | opens and **writes** to migrated copies — the class of breakage that passes every read-side check |
-| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | static package gates, cordis contract scan, keyless headless smoke | cross-version aggregation and a go/no-go verdict rather than a per-plugin health check |
-| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | external CLI; minimises a profile to the smallest plugin set that reproduces a failure | forward-looking (pre-upgrade) instead of backward-looking (post-failure); complementary |
+| [`@noob-stupid/dsh-plugin-console`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) | contract pre-check → config backup + full-tree rollback point → **executes the framework upgrade itself**, auto-rolling back on failure; "boot-failure isolation" names the culprit **from the boot log** and disables it (preset renamed `.broken-*`); its environment fingerprint also catches framework changes made through other channels | it lives inside the profile, and its pre-check is a **contract set diff** (`lib/server/domain/format-contract.js:4-7`). Its own `CHANGELOG.md:875` lists what it did not verify: it never ran a session carrying a preset — "(that needs a new session + **a real model call**)" — which is exactly the requirement this tool removes |
+| [`@linxin666/dsh-doctor` rescue capsule](https://github.com/zhu1090093659/dsh-web) | provisions a pinned DSH runtime plus an isolated `DSH_HOME`, gates the candidate with isolated `dump-config` and web health checks, promotes on pass, rolls back byte-exactly — structurally the closest thing to shadow-host + candidate-gate + atomic-promote | it gates the loader/config surface. Grepping its published tarball finds **no** `session` / `sessions/` reference on the node side, and "pinned" means the **current** version (for recovery), not a candidate |
+| [`dsh-test-drive`](https://github.com/PerryLink/dsh-test-drive) | install → patch-effective → cold boot → uninstall → cleanup, in a fresh `mkdtemp` throwaway `DSH_HOME` with a redirected pnpm store; `schema: "dsh-test-drive/v1"`; `action.yml` emits Markdown (PR comment) **and** JUnit XML. Its optional `capability` stage really drives one headless task and verifies **the durable session log recorded the invocation** | that stage needs `DEEPSEEK_API_KEY` and is "skipped, never failed" without one, and it opens a **newly created** session. This tool's write round is keyless and runs against **copies of your `v0→v4` history** |
+| [`@mars.liu/dsh-canary`](https://github.com/MarchLiu/dsh-canary) | a standalone npm CLI that really boots a throwaway composition of *your profile's bundle set + the candidate plugin* (`profiles/canary-<rand>`, reusing `node_modules` through absolute symlinks); L1 can pin a `dsh` version | what it varies is the **plugin**; session data is out of range. It ships no GitHub Action and has no `v1` schema discriminator |
+| [`@xiaoyuyu6420/dsh-backup`](https://github.com/xiaoyuyu6420/dsh-backup) | `/backup migrate-check` scans every generation of your session logs **read-only** (`lib/index.js:512`: "writes no files"), predicting against frozen per-generation rules which sessions will not open and which rule they trip; plus the zero-dependency `dsh-rescue` out-of-process console | the interesting part is not that it is static — it is that **the read side structurally cannot decide**. See the quote below |
+| [`dsh-plugin-doctor`](https://github.com/PerryLink/dsh-plugin-doctor) | package-structure R/K gates, cordis contract scan, keyless headless smoke (`MISSING_CREDENTIAL` counts as passing); exposes `coverage.<K>{filesInspected,mode}` + `degraded[]` + exit `6`, under the rule "a `skip` is never rendered as `PASS`" | a close relative, not a rival: this tool's `coverage` + `warnings[]` enforce the same discipline, aggregated into "may I upgrade" |
+| [`dsh-plugin-reducer`](https://github.com/ArmyWas/dsh-plugin-reducer) | external CLI; creates a fresh shadow `DSH_HOME` per probe and links the profile to the existing `node_modules` (**installs nothing**), minimising a failing profile to the smallest reproducing plugin set; also a weekly `upstream-canary.yml` probing `dsh-app-boot@next` for layout drift | it reduces **after** an incident; this tool runs **before** an upgrade. Complementary — and its canary watches upstream layout drift, not your sessions |
+
+**The "read side cannot decide" claim is testified by a competitor's own comment.** `dsh-backup` once treated an unknown `source.kind` as "will not open"; the production result was:
+
+> `kind 只作提示，不作判据（#113）：宿主把它设计成可合并扩展的联合类型……旧实现把"不在白名单"直接判成"打不开"，在一台真实机器上把 **81/82 份完全健康的日志**报成不可打开`
+> — `xiaoyuyu6420/dsh-backup` `lib/index.js:2617-2622` (*"kind is a hint, not a criterion (#113): the host designed it as a mergeable union type… the old implementation judged 'not in the whitelist' as 'cannot open', and on a real machine reported 81 of 82 perfectly healthy logs as unopenable"*)
+
+Facing the same corruption class, `gating-hub` rewrites **the producer's source** (contract rule `session-message-source-kind`: convert plugins still emitting the V3 `{kind:'plugin'}` wrapper to a producer-owned kind). So a static scan cannot judge it without false positives at scale, and a contract diff fixes code rather than data — while upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) is a session that **opens fine and explodes on every single turn**. Only an actual write round decides that, and writing a round used to require an API key. That gap is the entire reason this tool exists.
+
+Failure signatures this tool keys on, and what each one does *not* prove, are listed in [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md).
 
 ## Quick start
 
 ```sh
-# install (verified; served straight from the GitHub tag, no registry needed)
-npm install -g github:wuwaka/dsh-rehearsal#v0.1.0
+# install (served straight from the GitHub tag, no registry entry needed)
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
 
+dsh-rehearsal --version                               # confirm the bin actually landed
 dsh-rehearsal check --candidate 0.2.0-rc.2            # read-only pre-flight, seconds
-dsh-rehearsal run --to 0.2.0-rc.2 --sample 20         # full rehearsal (first run installs the candidate: ~2-5 min)
+dsh-rehearsal run --to 0.2.0-rc.2 --sample 20         # full rehearsal: installs the candidate and copies your sessions, 2-5 min first time
 dsh-rehearsal clean --yes                             # remove .dsh-rehearsal artifacts
 ```
 
@@ -167,8 +199,9 @@ Paste this to an agent that can drive a terminal:
 - Attachments are not copied or verified (`~/.dsh/attachments`, `cache/attachments`), so attachment-reference integrity is out of scope and stated as such rather than faked.
 - npm shadow ≠ Desktop installation: `run` cannot reproduce the Electron dependency closure (see [Compatibility](#compatibility)).
 - `rehearsal` measures the *write path*, not open-ended behaviour: the replay script is derived from that session's own recording, so tools and paths absent from the recording cannot appear.
-- `#1229`-class poison-row detection is built in but untriggerable on this machine's data (the `v3→v4` migration package has carried the `producerKind` rewrite since `0.2.0-rc.1`).
+- `#1229`-class poison-row detection is built in but untriggerable on this machine's data (the `v3→v4` migration package has carried the `producerKind` rewrite since `0.2.0-rc.1`); every signature and whether it can be reproduced here is tabulated in [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md).
 - `run` still shares one `--sample` knob between the migration drill and the write-round pool; widening write coverage means raising `--sample`.
+- **This tool is not in the `awesome-dsh-plugin` catalog, and should not be.** That catalog's `scripts/check-submission.mjs:258-264` hard-requires some `package.json` declaring `dsh.bundle` — declaring only `dsh.client` is refused — and `dsh-plugin-reducer` / `dsh-canary` are absent from it too (0 hits across its 4,412 entries, checked 2026-10-02). It indexes things you can `dsh plugin add`; this deliberately is not one. The right listings are tool catalogues: `walkinglabs/awesome-deepseek-harness-plugins` → `docs/INCLUSION_POLICY.md` rule 4 ("a client, launcher, or development resource … placed outside the plugin categories and labelled accordingly") and `awesome-deepseekharness/awesome-deepseek-harness` → `CONTRIBUTING.md`, category 🧩 Tools.
 
 ## Verifying that your real home was not touched
 
@@ -189,14 +222,19 @@ console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CL
 ## Development
 
 ```sh
-npm test        # 52 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
+npm test        # 57 tests: multi-frame zstd regression (naive zlib reads 1 line of 1,698) /
                 # peer grading / sandbox cwd rewrite + dir encoding / stderr sanitizer /
                 # structured scrubbing / read-only allowlist / env stripping /
                 # countRows structure / stratified selection / writeRoundVerdict /
-                # warnings rendering + scrubbing / end-to-end `check` CLI smoke
+                # warnings rendering + scrubbing / signature regression locks /
+                # end-to-end `check` CLI smoke
 ```
 
+The signature locks come in **pairs**: each log pattern must hit the real line copied from an upstream issue or from a captured artifact, and must *not* hit a healthy one. One more assertion requires that every id detected in code also appears in [`docs/FAILURE_MODES.md`](docs/FAILURE_MODES.md) — otherwise the doc rots into an unreviewed compatibility claim.
+
 CI runs `npm ci` + `npm test` on **windows / macOS / linux × Node 22.19 and 24.x**, plus two guard assertions: the `node:zlib` zstd API this tool depends on must exist, and the test suite must not leave fixture homes in `$HOME`. **CI never runs `rehearsal run`** — it installs ~500 packages and replays real session copies, which is neither deterministic nor appropriate on a shared runner; the safety model is covered offline instead.
+
+Releases are tag-triggered (`.github/workflows/release.yml`): **the job stops if the tag does not equal `package.json`'s version, and stops if `CHANGELOG.md` has no section for it**, then attaches the tarball plus its `.sha256` and uses that section as the release body. `publish.yml` handles npm and skips itself rather than failing when `NPM_TOKEN` is absent.
 
 Before publishing, read [PUBLISHING.md](PUBLISHING.md): pushing this history as-is would publish a pre-scrub snapshot (13 real paths across 5 files). The repo ships a verified single-commit `publish-clean` branch for exactly that.
 
