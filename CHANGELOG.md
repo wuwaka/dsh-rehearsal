@@ -21,18 +21,16 @@ Documentation and release integrity. No behaviour change to `check` or `run`.
 ### Changed
 
 - **Four positioning claims were retracted** after reading the source of seven
-  comparable projects, and the retractions stay in the history because they are
-  the interesting part:
+  comparable projects. The retractions are recorded rather than edited away:
   - "runs from outside the host" is not a differentiator — `dsh-plugin-reducer`,
     `dsh-canary`, `dsh-plugin-doctor`, `dsh-backup`'s `dsh-rescue` bin and
     `zzy6-a/dsh-upgrade-guard`'s out-of-host supervisor all do;
-  - the "a tool inside the profile dies when it matters" argument, which this
-    README originally presented as its own, is `dsh-plugin-gating-hub`'s, written
+  - the "a tool inside the profile dies when it matters" argument, which the README originally
+    presented as its own reasoning, is `dsh-plugin-gating-hub`'s, written
     there verbatim; it is now quoted and attributed;
   - "attempts a write round" is not unique — `dsh-test-drive`'s `capability`
     stage really appends a turn and reads the durable session log. What is
-    unique is doing it **without an API key**, against **migrated copies of your
-    own sessions**;
+    unique is doing it **without an API key**, against **migrated copies of the user's own sessions**;
   - `dsh-canary` was credited with a GitHub Action and a `v1` report schema. It
     has neither.
 - Boot-failure isolation in `dsh-plugin-gating-hub` is described correctly: it
@@ -121,8 +119,8 @@ pre-flight, `run` for a real rehearsal in a throwaway `DSH_HOME`.
 
 ### Fixed
 
-These were found in four review rounds **before** 0.1.0 shipped, and are listed
-because a tool whose product is a safety claim should not hide how it failed:
+Found in four review rounds before 0.1.0 shipped. Pre-release defects are recorded
+because the tool's conclusions depend on its safety claims being auditable:
 
 - a write round could **actually execute** recorded tool calls → default
   suppression plus the fail-closed allowlist (audit item P0-1);

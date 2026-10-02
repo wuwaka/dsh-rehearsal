@@ -88,10 +88,9 @@ out of the repo.
 
    Neither has been submitted as of 2026-10-02.
 
-4. **Only then add registry badges** (npm version/downloads, dshfind, marketplace). Do not
-   pre-add them: they 404 until listed, and a badge that resolves to nothing is worse than
-   no badge. The `dsh-doctor` gate badge is **not applicable** here — its R/K/D gates score
-   `dsh.bundle` packages, and this repository has none.
+4. **Add registry badges only after listing exists** (npm version/downloads, dshfind,
+   marketplace). Pre-added badges resolve to 404. The `dsh-doctor` gate badge does not apply:
+   its R/K/D gates score `dsh.bundle` packages, which this repository does not declare.
 
 5. Re-check the CI badge in the README header resolves once the first workflow run is green:
    `gh run list --repo <you>/dsh-rehearsal`.
@@ -134,10 +133,10 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 ```
 
 A tag containing `-` (e.g. `v0.3.0-rc.1`) is marked `--prerelease` automatically, and
-`publish.yml` will still try to npm-publish it — pass `--tag next` if a prerelease must not
-take the `latest` dist-tag. Never commit `*.tgz` or `SHA256SUMS.txt`; `.gitignore` covers
-both, because a checksum committed next to a *different* tarball than the tag points at is
-worse than no checksum.
+`publish.yml` will still attempt the npm publish — pass `--tag next` if a prerelease must not
+take the `latest` dist-tag. Never commit `*.tgz` or `SHA256SUMS.txt`; both are in
+`.gitignore`, because a committed checksum can go stale against the tarball the tag
+actually points at.
 
 ## Three claims in the README depend on measurement
 

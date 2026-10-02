@@ -1,12 +1,11 @@
 # Changelog · 中文
 
 格式：[Keep a Changelog](https://keepachangelog.com/zh-Hans/1.1.0/)，版本号遵循
-[语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。英文版是
-[CHANGELOG.md](CHANGELOG.md)，两份文件的**版本小节必须一一对应**
-（`test/changelog.test.js` 会断言这件事，`.github/workflows/release.yml` 缺任一份就拒绝发布）。
+[语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。英文版为
+[CHANGELOG.md](CHANGELOG.md)，两份文件的小节必须一一对应：`test/changelog.test.js` 断言该一致性，
+`.github/workflows/release.yml` 在缺任一份时终止发布。
 
-一个容易混的命名：下面的版本号是 **`dsh-rehearsal` 自己的**。`run --to <版本>` 里的那个版本号
-是**被测 `dsh` 的**，永远不会出现在这里。
+命名区分：本文件的版本号属于 `dsh-rehearsal`；`run --to <版本>` 中的版本属于被测 `dsh`，不记录在此。
 
 ## [Unreleased]
 
@@ -18,19 +17,18 @@
 
 ### 变更
 
-- **撤回四条定位主张** —— 读完 7 个同类项目的源码之后，才发现站不住的是我们自己的说法，
-  不是对方的功能。撤回留在历史里，因为这才是有意思的部分：
-  - "从宿主外面跑"不是差异点：`dsh-plugin-reducer`、`dsh-canary`、`dsh-plugin-doctor`、
-    `dsh-backup` 的 `dsh-rescue` bin、`zzy6-a/dsh-upgrade-guard` 的宿主外 supervisor 都在外面跑；
-  - 我原本当作立论开场的"装在待测 profile 里的工具会在最需要它的时候一起死掉"，
-    是 `dsh-plugin-gating-hub` README 里的**原话**，现已引用并署名；
-  - "会尝试写回合"也不唯一 —— `dsh-test-drive` 的 `capability` 阶段真的追加一轮并回读持久会话日志。
-    还站得住的是：**无键**、且打在**你自己的会话迁移副本**上；
-  - `dsh-canary` 被我们安上了 GitHub Action 和 `v1` 报告 schema，它两个都没有。
-- `dsh-plugin-gating-hub` 的"启动失败隔离"改成准确描述：从启动日志**点名**肇事插件后禁用，
-  不是"测出谁拖慢启动"。
-- 兼容性表按行拆开**实测**与**声明**，并给出日期，同时诚实承认：Node 24.x 那条腿只有 CI 验过、
-  非 Windows 的 `run` 从未真机跑过、还有两条 `warn` 签名在本机从没命中过。
+- **撤回四条定位主张**。核对 7 个同类项目源码后，站不住的是本项目的表述而非对方的功能：
+  - "从宿主外运行"不构成差异点：`dsh-plugin-reducer`、`dsh-canary`、`dsh-plugin-doctor`、
+    `dsh-backup` 的 `dsh-rescue` bin、`zzy6-a/dsh-upgrade-guard` 的宿主外 supervisor 均在宿主之外运行；
+  - README 中原作为立论开场的一句（"装在待测 profile 里的工具会在最需要它时一起失效"）
+    出自 `dsh-plugin-gating-hub` 的 `README.zh.md:282`，现改为引用并署名；
+  - "会尝试写回合"不唯一：`dsh-test-drive` 的 `capability` 阶段确实追加一轮并回读持久会话日志。
+    仍然成立的是范围更窄的表述——无键、且作用于用户自身会话的迁移副本；
+  - `dsh-canary` 被描述为提供 GitHub Action 与 `v1` 报告 schema，二者均不存在。
+- `dsh-plugin-gating-hub` 的"启动失败隔离"表述改为准确形式：从启动日志点名肇事插件后禁用，
+  不涉及启动耗时测量。
+- 兼容性表按行分列实测与声明并标注日期，同时列出未验证项：Node 24.x 仅在 CI 验证、
+  非 Windows 的 `run` 无真机预演、两条 `warn` 签名在本机从未命中。
 
 ### 新增
 
@@ -83,12 +81,11 @@
 - CI：windows / macOS / linux × Node 22.19 与 24.x，外加"zstd API 必须存在"和
   "测试不得在 `$HOME` 留夹具影子 home"两条护栏断言。**CI 从不跑 `run`**。
 - `publish.yml`：重新测试、把打包件装进临时前缀跑一遍 bin，然后 `npm publish --provenance`；
-  没有 `NPM_TOKEN` 时自我跳过而不是报红。
+  缺少 `NPM_TOKEN` 时跳过该步骤而不报错。
 
 ### 修复
 
-以下都是 0.1.0 发布**之前**四轮评审里找到的，列出来是因为"一个卖点是安全声明的工具
-不该藏自己怎么翻车的"：
+以下缺陷在 0.1.0 发布前的四轮评审中发现并修复。发布前缺陷保留记录，因为本工具的结论依赖其自身的安全声明可复核：
 
 - 写回合**可能真的执行**会话历史里的工具调用 → 默认抑制 + fail-closed 只读允许清单（P0-1）；
 - replay 的模型正文经 `stderr` 尾巴进报告 → 诊断白名单，并统计被丢弃的行数（P1-1）；
