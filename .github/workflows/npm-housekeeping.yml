@@ -1,0 +1,32 @@
+name: npm housekeeping
+
+# One-off npm management runner for operations the owner's granular token
+# cannot do (deprecate, dist-tag delete, ...): the repo's NPM_TOKEN has the
+# fuller permission set. Dispatched manually with an explicit npm command
+# input; intended to be removed once the pending housekeeping is done.
+
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: npm arguments, e.g. "dist-tag rm dsh-rehearsal some-tag"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Run npm command
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_ARGS: ${{ inputs.command }}
+        run: npm $NPM_ARGS --registry https://registry.npmjs.org
