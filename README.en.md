@@ -12,7 +12,7 @@ Upgrade rehearsal tool for DeepSeek Harness (`dsh`). It runs a candidate version
 [![release](https://img.shields.io/github/v/release/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/releases)
 [![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
 [![stars](https://img.shields.io/github/stars/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/stargazers)
-[![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe?style=flat-square)](https://github.com/topics/dsh-plugin)
+[![topic](https://img.shields.io/badge/topic-dsh-4d6bfe?style=flat-square)](https://github.com/topics/dsh)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#compatibility)
 
 </div>
@@ -32,10 +32,17 @@ The reason these are separate:
 
 Format migration is lazy and happens only when a session opens, and read-side checks pass data that opens but cannot be written. Upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) is exactly such a session: it opens normally and fails on every write round. The write round uses the official `@deepseek-ai/dsh-llm-replay` adapter to reconstruct model responses from that session's own recording, so it needs no API key and makes no live model request.
 
+## When it is needed
+
+- About to upgrade `dsh`, and worried that a plugin or peer dependency breaks on the new version? Run a read-only `check` first: dependency conflicts between every plugin and the candidate are listed finding by finding, split into newly-broken and pre-existing.
+- Session history is irreplaceable and the upgrade needs an escape hatch? The rehearsal runs entirely in a shadow `DSH_HOME`; the live installation and real sessions stay untouched, and `clean` removes every trace.
+- Will sessions in an older format generation still open after the upgrade — and still write? Opening is only the first step; `run` triggers the migration on session copies and verifies that migrated sessions can still be written back.
+- Is the upgrade decision worth a verifiable record? Every rehearsal writes `report.json` and `report.md`; verdicts come from artifacts, and reports are sanitized before they reach disk.
+
 ## Install
 
 ```sh
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.1
 ```
 
 Installed by tag; no npm account required. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
@@ -147,7 +154,7 @@ Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session 
 ## Development
 
 ```sh
-npm install && npm test     # 68 tests
+npm install && npm test     # 80 tests
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 

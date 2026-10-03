@@ -12,7 +12,7 @@ DeepSeek Harness（`dsh`）升级预演工具。不改动当前安装，用现�
 [![release](https://img.shields.io/github/v/release/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/releases)
 [![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
 [![stars](https://img.shields.io/github/stars/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/stargazers)
-[![topic](https://img.shields.io/badge/topic-dsh--plugin-4d6bfe?style=flat-square)](https://github.com/topics/dsh-plugin)
+[![topic](https://img.shields.io/badge/topic-dsh-4d6bfe?style=flat-square)](https://github.com/topics/dsh)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
 </div>
@@ -32,10 +32,17 @@ DeepSeek Harness（`dsh`）升级预演工具。不改动当前安装，用现�
 
 格式迁移是惰性的、只在会话被打开时发生；只读校验对"能打开但写不进去"的数据会判通过。上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) 就是一份打开正常、每个写回合都失败的会话。写回合用官方 `@deepseek-ai/dsh-llm-replay` 重建该会话自己录制流中的模型响应，因此不需要 API 键，也不会发起真实的模型请求。
 
+## 什么时候需要它
+
+- 准备升级 `dsh`，担心插件或对等依赖在新版本上坏掉？先跑一次只读的 `check`：全部插件对候选版本的依赖冲突逐条列出，并区分"新破坏"与"既有问题"。
+- 会话历史不可替代，升级需要留退路？预演全程在影子 `DSH_HOME` 里进行，真实安装与会话原样不动，`clean` 之后不留痕迹。
+- 老格式的会话，升级后还能打开、还能写吗？打开只是第一步；`run` 对会话副本触发迁移，并验证迁移后的会话还能写回。
+- 升级决策想要可核验的依据？每次预演落盘 `report.json` 与 `report.md`，判定来自产物，报告写盘前脱敏。
+
 ## 安装
 
 ```sh
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.0
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.1
 ```
 
 按 tag 安装，不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
@@ -147,7 +154,7 @@ Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代
 ## 开发
 
 ```sh
-npm install && npm test     # 68 个测试
+npm install && npm test     # 80 个测试
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 
