@@ -11,6 +11,17 @@ const root = path.join(import.meta.dirname, '..');
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8').split(/\r?\n/);
 const headers = (f) => read(f).map((l) => (l.match(/^## \[([^\]]+)\]/) || [])[1]).filter(Boolean);
 
+/** The body of a release section, without its `## [x]` header line. */
+function sectionOf(file, ver) {
+  const lines = read(file);
+  const start = lines.findIndex((l) => l.startsWith(`## [${ver}]`));
+  if (start === -1) return null;
+  let end = lines.findIndex((l, i) => i > start && /^## \[/.test(l));
+  if (end === -1) end = lines.length;
+  const body = lines.slice(start + 1, end).join('\n').trim();
+  return body || null;
+}
+
 test('both changelogs list the same versions in the same order', () => {
   assert.deepEqual(headers('CHANGELOG.zh.md'), headers('CHANGELOG.md'));
 });
@@ -37,9 +48,15 @@ test('release-notes.mjs emits both languages and refuses an unknown version', ()
   const ok = spawnSync(process.execPath, [path.join(root, 'scripts', 'release-notes.mjs'), `v${ver}`], { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
   assert.match(ok.stdout, /安装 · Install/);
-  assert.match(ok.stdout, /### Added/);
-  assert.ok(ok.stdout.includes('撤回四条定位主张'), 'Chinese section absent');
-  assert.ok(ok.stdout.includes('retracted'), 'English section absent');
+  // Structural, not content-pinned: the notes must carry this version's Chinese
+  // section and its English twin, in that order, whichever subsection headings
+  // that release happens to use. Pinning the assertions to one release's wording
+  // made the suite fail on every subsequent bump.
+  const zhSection = sectionOf('CHANGELOG.zh.md', ver);
+  const enSection = sectionOf('CHANGELOG.md', ver);
+  assert.ok(zhSection && enSection, `no CHANGELOG section for ${ver} in one or both languages`);
+  assert.ok(ok.stdout.includes(zhSection.split('\n')[0]), 'Chinese section absent');
+  assert.ok(ok.stdout.includes(enSection.split('\n')[0]), 'English section absent');
   assert.match(ok.stdout, /compare\/v\d+\.\d+\.\d+\.\.\.v/);
 
   const bad = spawnSync(process.execPath, [path.join(root, 'scripts', 'release-notes.mjs'), 'v9.9.9'], { encoding: 'utf8' });

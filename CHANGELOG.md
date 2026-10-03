@@ -11,6 +11,10 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-03
+
+Documentation and release verifiability. The behaviour of `check` and `run` is **unchanged**.
+
 ### Changed
 
 - The README was cut from 247 lines to roughly 130, keeping only positioning, install, quick start, a real output sample, reports, coverage, a safety summary, compatibility and limitations. Everything moved out went into the new `docs/architecture.md`.
@@ -220,6 +224,7 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.1.0

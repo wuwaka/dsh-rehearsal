@@ -9,6 +9,10 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-03
+
+文档与发布可核验性。`check` 与 `run` 的行为**没有任何改动**。
+
 ### 变更
 
 - README 从 247 行压到约 130 行：只保留定位、安装、快速开始、真实输出示例、报告、覆盖范围、
@@ -159,6 +163,7 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.1.0
