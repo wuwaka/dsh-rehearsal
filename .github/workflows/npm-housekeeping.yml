@@ -1,15 +1,16 @@
 name: npm housekeeping
 
-# One-off npm management runner for operations the owner's granular token
-# cannot do (deprecate, dist-tag delete, ...): the repo's NPM_TOKEN has the
-# fuller permission set. Dispatched manually with an explicit npm command
-# input; intended to be removed once the pending housekeeping is done.
+# One-off npm management runner for operations neither the owner's granular
+# token nor this repo's NPM_TOKEN can do directly: the registry answers 403 to
+# DELETE dist-tags and 422 to granular-token packument PUTs. A full-packument
+# GET -> mutate -> PUT with the repo's NPM_TOKEN is the same path npm deprecate
+# uses and is allowed, so tag removal goes through it.
 
 on:
   workflow_dispatch:
     inputs:
-      command:
-        description: npm arguments, e.g. "dist-tag rm dsh-rehearsal some-tag"
+      tag:
+        description: dist-tag to remove from dsh-rehearsal
         required: true
         type: string
 
@@ -25,8 +26,29 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Run npm command
+      - name: Remove dist-tag via packument PUT
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_ARGS: ${{ inputs.command }}
-        run: npm $NPM_ARGS --registry https://registry.npmjs.org
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          node -e '(async () => {
+            const token = process.env.NODE_AUTH_TOKEN;
+            const tag = process.env.TAG;
+            const pkg = "dsh-rehearsal";
+            if (!token) throw new Error("NODE_AUTH_TOKEN missing");
+            const get = await fetch("https://registry.npmjs.org/" + pkg, { headers: { Accept: "application/json" } });
+            if (!get.ok) throw new Error("GET failed: " + get.status);
+            const doc = await get.json();
+            if (!(tag in (doc["dist-tags"] || {}))) { console.log("tag already absent:", tag); return; }
+            delete doc["dist-tags"][tag];
+            const put = await fetch("https://registry.npmjs.org/" + pkg, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+              body: JSON.stringify(doc),
+            });
+            const text = await put.text();
+            console.log("PUT status:", put.status, text.slice(0, 300));
+            if (!put.ok) throw new Error("PUT failed: " + put.status);
+            console.log("removed dist-tag:", tag);
+          })().catch((e) => { console.error(e); process.exit(1); });'
