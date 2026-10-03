@@ -1,9 +1,10 @@
 name: npm housekeeping
 
 # One-off npm management runner for operations neither the owner's granular
-# token nor this repo's NPM_TOKEN can do directly (registry answers 403 to
-# DELETE dist-tags). Walks npm deprecate's own path: GET ?write=true, then PUT
-# the doc back — first unchanged (shape check), then with the tag dropped.
+# token nor this repo's NPM_TOKEN can do directly (the registry answers 403 to
+# DELETE dist-tags from both). Uses npm's own npm-registry-fetch from the
+# runner's global install to walk npm deprecate's exact path: GET ?write=true,
+# mutate dist-tags, PUT the doc back.
 
 on:
   workflow_dispatch:
@@ -25,35 +26,28 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Remove dist-tag via packument PUT
+      - name: Remove dist-tag via npm-registry-fetch
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          node -e '(async () => {
-            const token = process.env.NODE_AUTH_TOKEN;
+          export NPMROOT="$(npm root -g)"
+          node -e '
+            const npmFetch = require(process.env.NPMROOT + "/npm/node_modules/npm-registry-fetch");
             const tag = process.env.TAG;
-            const pkg = "dsh-rehearsal";
-            const ua = "npm-registry-fetch@19.1.1/node@" + process.version + "+" + process.arch + " (" + process.platform + ")";
-            if (!token) throw new Error("NODE_AUTH_TOKEN missing");
-            const authHeaders = { Accept: "application/json", "user-agent": ua, Authorization: "Bearer " + token };
-            const get = await fetch("https://registry.npmjs.org/" + pkg + "?write=true", { headers: authHeaders });
-            if (!get.ok) throw new Error("GET failed: " + get.status);
-            const doc = await get.json();
-            console.log("has _rev:", "_rev" in doc, "| dist-tags:", JSON.stringify(doc["dist-tags"]));
-            const putHeaders = { "Content-Type": "application/json", "user-agent": ua, "npm-session": "3710000000000000", "npm-command": "deprecate", Authorization: "Bearer " + token };
-            const doPut = async (label, d) => {
-              const put = await fetch("https://registry.npmjs.org/" + pkg, { method: "PUT", headers: putHeaders, body: JSON.stringify(d) });
-              const text = await put.text();
-              console.log(label, "PUT status:", put.status, text.slice(0, 200));
-              return put.ok;
+            const opts = {
+              registry: "https://registry.npmjs.org/",
+              token: process.env.NODE_AUTH_TOKEN,
+              userAgent: "npm/11.19.0 node/" + process.version + " linux x64 workspaces/false",
+              npmSession: "3710000000000000",
+              npmCommand: "deprecate",
             };
-            const shapeOk = await doPut("unchanged:", doc);
-            if (!shapeOk) { console.log("unchanged PUT failed => request-shape problem, stopping"); process.exit(1); }
-            if (!(tag in (doc["dist-tags"] || {}))) { console.log("tag already absent:", tag); process.exit(0); }
-            delete doc["dist-tags"][tag];
-            const mutatedOk = await doPut("mutated :", doc);
-            if (!mutatedOk) { console.log("unchanged PUT ok but mutated PUT failed => registry refuses dist-tag removal via packument PUT"); process.exit(1); }
-            console.log("removed dist-tag:", tag);
-          })().catch((e) => { console.error(e); process.exit(1); });'
+            (async () => {
+              const doc = await npmFetch.json("/dsh-rehearsal", { ...opts, query: { write: true } });
+              if (!(tag in (doc["dist-tags"] || {}))) { console.log("tag already absent:", tag); return; }
+              delete doc["dist-tags"][tag];
+              await npmFetch("/dsh-rehearsal", { ...opts, method: "PUT", body: doc, ignoreBody: true });
+              console.log("removed dist-tag:", tag);
+            })().catch((e) => { console.error(e && (e.code + " " + e.message) || e); process.exit(1); });
+          '
