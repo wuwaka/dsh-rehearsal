@@ -1,0 +1,36 @@
+name: Deprecate npm version
+
+# One-off housekeeping runner: marks an old npm version deprecated using the
+# repo's NPM_TOKEN, for machines without an npmjs.org login. Dispatched manually
+# with explicit version + message inputs; removed once the backlog is marked.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version to deprecate, e.g. 0.2.0
+        required: true
+        type: string
+      message:
+        description: deprecation message shown by npm
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deprecate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Deprecate the named version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DEP_VERSION: ${{ inputs.version }}
+          DEP_MESSAGE: ${{ inputs.message }}
+        run: npm deprecate "dsh-rehearsal@$DEP_VERSION" "$DEP_MESSAGE"
