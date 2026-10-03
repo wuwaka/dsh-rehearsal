@@ -37,7 +37,7 @@ jobs:
             const tag = process.env.TAG;
             const pkg = "dsh-rehearsal";
             if (!token) throw new Error("NODE_AUTH_TOKEN missing");
-            const get = await fetch("https://registry.npmjs.org/" + pkg, { headers: { Accept: "application/json" } });
+            const get = await fetch("https://registry.npmjs.org/" + pkg + "?write=true", { headers: { Accept: "application/json", Authorization: "Bearer " + token } });
             if (!get.ok) throw new Error("GET failed: " + get.status);
             const doc = await get.json();
             if (!(tag in (doc["dist-tags"] || {}))) { console.log("tag already absent:", tag); return; }
