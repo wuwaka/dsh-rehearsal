@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { decodeLines, decodeAll, magicOffsets } from './zfstd.js';
-import { run, shadowEnv } from './util.js';
+import { run, shadowEnv, ASSUMED_CONTEXT_WINDOW_TOKENS } from './util.js';
 
 export const WRITE_FAIL_SIGNATURES = [
   {
@@ -124,7 +124,7 @@ export function extractRoutes(fixtureText) {
       const model = cfg.model ?? 'deepseek-flash';
       if (!routes.has(provider)) routes.set(provider, { id: provider, name: provider, models: [] });
       const entry = routes.get(provider);
-      if (!entry.models.some((m) => m.id === model)) entry.models.push({ id: model, contextWindow: 256000 });
+      if (!entry.models.some((m) => m.id === model)) entry.models.push({ id: model, contextWindow: ASSUMED_CONTEXT_WINDOW_TOKENS });
     } catch { /* ignore malformed rows */ }
   }
   return [...routes.values()];

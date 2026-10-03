@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { run, shadowEnv } from './util.js';
+import { run, shadowEnv, ASSUMED_CONTEXT_WINDOW_TOKENS } from './util.js';
 
 /**
  * Find npm's npm-cli.js: first beside the running node, then derived from
@@ -187,7 +187,7 @@ export function writeReplayPatch(shadowHome, bin, { adapterNamePrefixes, provide
   const routes = providers
     .map((p) => {
       const models = p.models
-        .map((m) => `            - id: ${JSON.stringify(String(m.id))}\n              contextWindow: ${Number(m.contextWindow) || 256000}`)
+        .map((m) => `            - id: ${JSON.stringify(String(m.id))}\n              contextWindow: ${Number(m.contextWindow) || ASSUMED_CONTEXT_WINDOW_TOKENS}`)
         .join('\n');
       return `        - id: ${JSON.stringify(String(p.id))}\n          name: ${JSON.stringify(String(p.name ?? p.id))}\n          models:\n${models}`;
     })

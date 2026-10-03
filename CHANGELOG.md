@@ -11,6 +11,11 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+### Changed
+
+- The assumed model context window `256000` is consolidated from two magic literals (the default entry in `extractRoutes` and the fallback in the shadow settings serializer) into one named constant, `ASSUMED_CONTEXT_WINDOW_TOKENS` in `util.js`, with a regression lock: the literal is allowed only at the constant's definition (test count 80 → 81).
+- `SECURITY.md` now states the failure direction of the tool-suppression list (`TOOL_ROW_NAME_PREFIXES`): a list missing a new tool family leaves suppression incomplete but opens no execution path — the write round only replays tool calls that appear in the session's own recording and all passed the read-only allowlist, and `--allow-tools` (off by default) remains the outermost gate. A citation assertion backs it in the docs test.
+
 ## [0.2.1] - 2026-10-03
 
 Documentation and release verifiability. The behaviour of `check` and `run` is **unchanged**.

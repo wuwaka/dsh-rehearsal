@@ -4,6 +4,16 @@
 import { spawnSync } from 'node:child_process';
 
 /**
+ * Assumed model context window (tokens) when a session's recorded routes do
+ * not carry one: `extractRoutes` writes it into every discovered model entry,
+ * and the shadow settings serializer falls back to it for falsy values. The
+ * replay adapter needs a number for the provider catalog; the value is an
+ * assumption about the DeepSeek window, not a measured fact, so it lives in
+ * exactly one place (a source-grep test pins that).
+ */
+export const ASSUMED_CONTEXT_WINDOW_TOKENS = 256000;
+
+/**
  * Run a command. stdout and stderr are NEVER merged: the candidate dsh CLI
  * prints warnings on stderr while writing valid JSON to stdout, and
  * `--dump-config-schema` exits 1 even on success — so exit codes alone are

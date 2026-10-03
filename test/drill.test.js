@@ -1,6 +1,7 @@
 // drill: stderr sanitization (P1-1 + round-3 tightening), tool pre-screen
 // allowlist (P0-1 + round-3 fail-open fix), tool/result forensics, and
-// bidirectional turn balance (P2-2).
+// bidirectional turn balance (P2-2). Also guards the assumed-context-window
+// constant against re-scattering into a second magic literal.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,6 +14,7 @@ import {
   extractHistoryTools, classifyHistory, WRITE_CLASS_TOOLS, READONLY_TOOLS,
   classifyToolResults, readIntegrity, writeRoundVerdict,
 } from '../src/lib/drill.js';
+import { ASSUMED_CONTEXT_WINDOW_TOKENS } from '../src/lib/util.js';
 
 test('sanitizeStderr drops replayed prose, keeps diagnostics (P1-1)', () => {
   const stderr = [
@@ -143,4 +145,24 @@ test('writeRoundVerdict: preset-only rounds cannot decide the stage (round 4)', 
   assert.equal(writeRoundVerdict({ results: [R('inconclusive', true), R('inconclusive', true)] }), 'inconclusive', 'preset-only attempts yield no write evidence at all');
   assert.equal(writeRoundVerdict({ results: [R('pass'), R('fail', true)] }), 'fail', 'any fail still blocks');
   assert.equal(writeRoundVerdict({ results: [R('inconclusive'), R('pass')] }), 'inconclusive', 'a plain inconclusive is real uncertainty');
+});
+
+test('the assumed context window lives in exactly one place', () => {
+  // Regression lock: 256000 used to sit as a bare literal in drill.js
+  // (extractRoutes' default model entry) and again in shadow.js (the settings
+  // serializer's fallback). It must exist only as ASSUMED_CONTEXT_WINDOW_TOKENS
+  // in util.js, and both consumers must reference the named constant.
+  const src = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
+  const files = ['src/lib/util.js', 'src/lib/drill.js', 'src/lib/shadow.js'];
+  const hits = [];
+  for (const f of files) {
+    src(f).split(/\r?\n/).forEach((l, i) => {
+      if (/256000/.test(l)) hits.push(`${f}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(hits, ['src/lib/util.js:' + (src('src/lib/util.js').split(/\r?\n/).findIndex((l) => l.includes('ASSUMED_CONTEXT_WINDOW_TOKENS =')) + 1)],
+    `the literal must appear only at the constant's definition, found: ${hits.join(', ')}`);
+  assert.equal(ASSUMED_CONTEXT_WINDOW_TOKENS, 256000);
+  assert.match(src('src/lib/drill.js'), /ASSUMED_CONTEXT_WINDOW_TOKENS/, 'drill.js must use the named constant');
+  assert.match(src('src/lib/shadow.js'), /ASSUMED_CONTEXT_WINDOW_TOKENS/, 'shadow.js must use the named constant');
 });

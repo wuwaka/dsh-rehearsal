@@ -12,11 +12,13 @@ The properties below are enforced in code and covered by tests. A report that an
 |---|---|
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:56-75` |
-| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:75` |
+| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:66-85` |
+| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:85` |
 | Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:199`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
 | The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
+
+The failure direction of the tool-suppression list (`src/lib/shadow.js:138`) is one-sided: if a new tool family escapes the list, its row stays enabled, but this opens no execution path — the write round only replays tool calls that appear in the session's own recording, and sessions whose history carries unknown or write-class tools are skipped wholesale at the pre-screen (fail-closed). A stale list leaves suppression incomplete; it never lets an unexpected tool execute. `--allow-tools` (off by default) remains the outermost explicit gate.
 
 ## Explicitly dangerous options
 

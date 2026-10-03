@@ -12,11 +12,13 @@
 |---|---|
 | 预演不向活动 profile 安装任何内容；候选版本装入私有 npm 前缀，`DSH_HOME` 指向别处 | `src/lib/shadow.js` `installCandidate` |
 | 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
-| 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:56-75` |
-| 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:75` |
+| 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:66-85` |
+| 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:85` |
 | 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:199`；另有测试对最终报告 grep 家目录与推理标记 |
 | 默认同时按行 id 与包名前缀抑制工具提供方；仅当会话历史中的全部工具都在只读允许清单内时才演练（fail-closed） | `src/lib/shadow.js`、`src/lib/drill.js` |
 | 影子 home 内含明文会话副本，所有退出路径都会删除，结果记录为 `shadowCleanup` | `src/commands/run.js` |
+
+关于工具抑制名单（`src/lib/shadow.js:138`）的失效方向：名单缺了新出现的工具家族时，对应行不会被禁用，但这不构成放行路径——写回合回放的调用集合限于会话录制中出现过的调用，且历史里带未知或写类工具的会话在预检就被整体跳过（fail-closed）。名单过期只会让抑制不完整，不会让未预期的工具执行；`--allow-tools` 默认关闭仍是最外层的显式闸门。
 
 ## 显式危险选项
 
