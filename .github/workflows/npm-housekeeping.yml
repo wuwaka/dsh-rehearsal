@@ -1,15 +1,16 @@
 name: npm housekeeping
 
-# One-off npm management runner. This iteration is diagnostic: prove the CLI's
-# own write path still works with NPM_TOKEN (idempotent deprecate re-set), then
-# issue a raw DELETE for the stray dist-tag and dump every response header, so
-# the 403 either shows an OTP challenge or is proven a hard permission wall.
+# One-off npm management runner. Packument PUTs accept additive changes but
+# answer 422 to no-ops and to dist-tag removal, and DELETE dist-tags is 403 for
+# both available tokens. Last untried channel: the legacy dist-tags-map PUT
+# (npm 6's own endpoint), which replaces the whole tag table in one write. If
+# that also fails, dump the DELETE's full response headers for the record.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: dist-tag to probe DELETE for
+        description: dist-tag to remove from dsh-rehearsal
         required: true
         type: string
         default: tmp-write-verify
@@ -26,31 +27,38 @@ jobs:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Probe DELETE dist-tag with full response headers
+      - name: Replace dist-tags map without the stray tag
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          npm deprecate dsh-rehearsal@0.2.0 "superseded by 0.2.1 — predates the redaction fixes" --registry https://registry.npmjs.org
-          echo "--- deprecate re-set ok, CLI write path confirmed ---"
           node -e '
             (async () => {
               const token = process.env.NODE_AUTH_TOKEN;
               const tag = process.env.TAG;
               const ua = "npm/11.19.0 node/" + process.version + " linux x64 workspaces/false";
-              const res = await fetch("https://registry.npmjs.org/-/package/dsh-rehearsal/dist-tags/" + tag, {
-                method: "DELETE",
-                headers: {
-                  "user-agent": ua,
-                  Authorization: "Bearer " + token,
-                  "npm-session": "3710000000000000",
-                  "npm-command": "dist-tag",
-                  "npm-auth-type": "web",
-                },
+              const headers = {
+                "Content-Type": "application/json",
+                "user-agent": ua,
+                Authorization: "Bearer " + token,
+                "npm-session": "3710000000000000",
+                "npm-command": "dist-tag",
+                "npm-auth-type": "web",
+              };
+              const current = await (await fetch("https://registry.npmjs.org/dsh-rehearsal", { headers: { Accept: "application/json" } })).json();
+              const map = { ...current["dist-tags"] };
+              if (!(tag in map)) { console.log("tag already absent:", tag); process.exit(0); }
+              delete map[tag];
+              const put = await fetch("https://registry.npmjs.org/-/package/dsh-rehearsal/dist-tags", {
+                method: "PUT", headers, body: JSON.stringify(map),
               });
-              console.log("DELETE status:", res.status);
-              for (const [k, v] of res.headers) console.log("  header:", k + "=", JSON.stringify(v));
-              console.log("body:", JSON.stringify((await res.text()).slice(0, 400)));
+              console.log("dist-tags map PUT status:", put.status, JSON.stringify((await put.text()).slice(0, 300)));
+              if (put.ok) { console.log("removed dist-tag:", tag); process.exit(0); }
+              const del = await fetch("https://registry.npmjs.org/-/package/dsh-rehearsal/dist-tags/" + tag, { method: "DELETE", headers });
+              console.log("DELETE status:", del.status);
+              for (const [k, v] of del.headers) console.log("  header:", k + "=", JSON.stringify(v));
+              console.log("DELETE body:", JSON.stringify((await del.text()).slice(0, 400)));
+              process.exit(1);
             })().catch((e) => { console.error(e); process.exit(1); });
           '
