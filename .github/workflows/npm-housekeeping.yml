@@ -38,7 +38,8 @@ jobs:
             const tag = process.env.TAG;
             const opts = {
               registry: "https://registry.npmjs.org/",
-              token: process.env.NODE_AUTH_TOKEN,
+              forceAuth: { token: process.env.NODE_AUTH_TOKEN },
+              authType: "web",
               userAgent: "npm/11.19.0 node/" + process.version + " linux x64 workspaces/false",
               npmSession: "3710000000000000",
               npmCommand: "deprecate",
