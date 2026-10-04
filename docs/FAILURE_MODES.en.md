@@ -75,16 +75,3 @@ Write rounds for preset sessions therefore run and are reported (`evidence[].pre
 `coverage.writeRounds.presetAttempts` / `presetPass`) but cannot decide a stage verdict alone:
 `writeRoundVerdict()` (`src/lib/drill.js:101`) takes pass/fail only over non-preset rounds, and a
 sample containing only presets yields `inconclusive` for the stage.
-
-## 5. Adding a signature
-
-The procedure follows `dsh-plugin-lab`, with the anchor changed to an issue number:
-
-1. Add `{id, pattern, note, severity}` to `WRITE_FAIL_SIGNATURES` in `src/lib/drill.js` or
-   `BOOT_SIGNATURES` in `src/commands/run.js`; `note` states the origin (issue number or
-   `file:line`).
-2. Add a matched pair of assertions in `test/signatures.test.js`: the real log line must hit, a
-   healthy line must not. The log must be copied from an issue body or a real artifact, never
-   invented to satisfy the regex.
-3. Add a row to the relevant table above and state honestly whether it is reproducible here.
-   Recording the reason matters: without it a reader assumes the case was tested.

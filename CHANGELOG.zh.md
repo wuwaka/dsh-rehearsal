@@ -13,6 +13,12 @@
 
 - 假设的模型上下文窗口 `256000` 从两处魔数（`extractRoutes` 造默认模型条目、影子 settings 序列化的兜底）收敛为 `util.js` 的命名常量 `ASSUMED_CONTEXT_WINDOW_TOKENS`，并加回归锁：该字面量只允许出现在常量定义处（测试数 80 → 81）。
 - `SECURITY.md` 补充工具抑制名单（`TOOL_ROW_NAME_PREFIXES`）的失效方向：名单缺了新工具家族只会让抑制不完整，不构成放行路径——写回合只回放会话录制中出现且全部通过只读白名单的调用，`--allow-tools` 默认关闭仍是最外层闸门。引用断言同步加入文档测试。
+- README 首屏正面陈述核心差异：迁移成功不等于写回（含"读侧静态检查无法判定该类损坏"的依据，
+  及七个同类工具逐项对照的链接）；新增「为什么是独立 CLI，而不是插件」；使用场景由反问改为直陈；
+  删除硬编码的测试数；`report` 与 `clean` 两个命令显名。
+- `SECURITY.md` 同一边界只说一次：删除重复段落与拟人表述。`PUBLISHING.md` 收敛为发布操作手册，
+  维护者知识（目录投稿调查、仓库图片、文档治理、新增签名的步骤）移入新增的 `docs/MAINTAINING.md`；
+  `docs/FAILURE_MODES.md` 的「新增一条签名」一并移入，正文收敛为纯 reference。
 
 ## [0.2.1] - 2026-10-03
 
@@ -27,7 +33,7 @@
 - 新增一句核心边界：**迁移成功不等于迁移后的会话还能写回**。
 - "全程无需 API 键"改为准确表述：写回合走 `@deepseek-ai/dsh-llm-replay` 的录制回放路径，
   不发起真实模型请求。
-- 术语统一：预检 / 预演 / 迁移 / 写回（pre-flight / rehearsal / migration / write round）；
+- 术语统一：预检 / 预演 / 迁移 / 写回合（pre-flight / rehearsal / migration / write round）；
   状态词统一为 Tested / Inferred / Not tested / Unsupported / Not covered。
 - 删除"由报告自证""逐条核对对方源码"这类审计腔措辞。
 - `SECURITY.md` 重排为：代码保证 / 显式危险选项 / 报告是敏感数据 / 范围之外 / 自查方法 / 上报方式。
@@ -51,12 +57,12 @@
   root 运行时的默认家目录）、`/var/lib/<服务名>`、`/srv/<团队>`、`/tmp/<影子目录>`、UNC 共享与 `../`
   相对路径全部原样穿过。本轮按**类**修：过滤器补齐这些形状（URL 与仓库相对路径各有测试保证不被误遮）；
   `scrubValue` 原先只清值不清键，以路径作键会整体绕过，现已一并清；`finalize()` 增加不变量，用同一
-  检测器复扫完整报告，任何漏网的 path-shaped 文本写入 `warnings[]`（`redaction gap: …`），于是将来新
-  阶段拼出新式路径时报告自己承认，而不是安静发布。测试数 70 → 73。
+  检测器复扫完整报告，任何漏网的 path-shaped 文本写入 `warnings[]`（`redaction gap: …`），将来新
+  阶段拼出新式路径时会带上该警告落盘，而不是无声通过。测试数 70 → 73。
 - `privacy.scrubbed: true` 原先写在 `newReport()` 里，等于**构造时就宣称已脱敏**；而 redaction-gap
   不变量在 `finalize()` 内部，所以"某阶段绕过 `finalize()`"这一场景并未被覆盖（评审指出，判断正确）。
   现在该字段由 `finalize()` 依据不变量结果写入：没扫干净就是 `false`。同时新增 `writeReport()`
-  作为唯一落盘入口，未 finalize 的报告会被就地补做，绕不过去。
+  作为唯一落盘入口，未 finalize 的报告会在落盘前被就地补做。
 - `check` 不带 `--candidate` 时，`0 newly-broken high` 是空转出来的数字却按结果呈现。现在该阶段判
   `warn`、`details` 写明"comparison NOT exercised"、并写入一条 `warnings[]`，退出码为 `1` 而非 `0`。
 - `defaultHome()` 在 `USERPROFILE` 与 `HOME` 同时缺失时（裸容器）会走到
@@ -95,13 +101,12 @@
 - `docs/FAILURE_MODES.md`：工具识别的每一条日志形态，有上游 issue 编号的就锚到编号
   （`#1229`、`#1294`），并写清"没命中"能排除什么、哪些在本机**根本复现不了**。
 - 签名回归锁：每条形态必须命中抄自 issue 正文/真机产物的原文，且必须**不**命中健康行；
-  另有一条断言要求"代码里检测的每个 id 都必须出现在那张表里"，否则文档会静默腐烂成
-  没人复核过的兼容性声明（`test/signatures.test.js`，测试数 52 → 57）。
+  另有一条断言要求"代码里检测的每个 id 都必须出现在那张表里"，否则文档与代码会各自漂移、
+  无人察觉（`test/signatures.test.js`，测试数 52 → 57）。
 - 本 `CHANGELOG.md` 与中文版 `CHANGELOG.zh.md`。
 - `.github/workflows/release.yml`：由 tag 触发切 Release。**tag 不等于 `package.json`
   里的版本就停；本文件没有对应小节也停** —— 于是"说明"不可能事后补。它把打包 tarball
-  和它的 `.sha256` 一起附上（社区目录的可选 `tarball` 键要求的正是这个形状：https、
-  GitHub Release 托管、`.tgz` 结尾），正文取下述对应小节。
+  和它的 `.sha256` 一起附上，固定到字节的安装行因此可核验，正文取下述对应小节。
 - `SECURITY.md` 与 issue 模板：必填项是 `dsh` 版本、OS、Node、工具版本，外加隐私闸门 ——
   **报告与 issue 里都不许出现会话正文**。
 
@@ -111,7 +116,7 @@
   而 `3` 正是本 README 定义的"彩排自身失败"。这个缺陷只在"`npm pack` → 装进临时前缀 →
   跑那个 bin"时暴露，跑源码 `node src/cli.js` 完全看不见。
 - `v0.1.0` 作为 GitHub Release 发出去时**没有正文、没有附件**。它保持原样（历史不可变），
-  本次建立起流水线，之后的版本不可能再这么薄。
+  本次建立起流水线，此后的 release 都会带正文与附件。
 
 ## [0.1.0] - 2026-10-02
 
@@ -125,7 +130,7 @@
   `@deepseek-ai/cordis` 多 pin 冲突、枚举式 prerelease 范围（`^0.1.7-rc.2` 不匹配
   `0.2.0-rc.2`）、`link:` / `file:` / `github:` 不可复现依赖。
 - **peer 发现按方向分级**：只有"今天满足、候选不满足"才是阻断性 `high`；两边都不满足记
-  `pre-existing` —— 今天就已错配的不是这次升级的锅。
+  `pre-existing` —— 今天就已存在的错配不是本次升级引入的。
 - **`run --to <版本>`** —— 把候选装进自己的私有 npm 前缀，冷启动两次，把你真实会话的副本
   拷进影子 home，在副本上触发惰性 `v0→…→v4` 迁移，做读侧完整性校验，然后用官方
   `@deepseek-ai/dsh-llm-replay` 尝试**一个无键写回合**。

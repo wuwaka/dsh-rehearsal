@@ -385,7 +385,7 @@ Disposition and evidence per finding. The baseline is the commit named in the me
 | P2-11 adoption-gate patch | Kept; the banner is already disclosed in the c-shadow details | Run evidence |
 | P2-12 sample is a string | `Number()` + positive-integer validation, throwing on anything invalid | Code review |
 
-### Third batch backlog (items not done)
+### Third batch backlog (items not done as of the 2026-10-02 acceptance; some have since landed separately, see the CHANGELOG)
 
 - `.github/workflows/ci.yml` three-platform CI
 - A `dsh-test-drive/v1` compatibility layer (the current schema is `dsh-rehearsal/v1`, and the stage records are only "stylistically similar")

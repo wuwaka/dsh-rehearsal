@@ -38,10 +38,10 @@ Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse 
 
 Two structural guarantees rather than more regexes:
 
-- **paths are not written in the first place where a path is not the fact**. Fields such as DSH_HOME record a shape (`home=default|custom|unknown`), so no path ever enters the string.
-- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. A future stage that composes an unknown style therefore admits it, instead of quietly publishing the path. `writeReport()` is the only writer, and it finalizes an un-finalized report on the way to disk.
+- **a path is written only when the path is the fact**. Fields such as DSH_HOME record a shape (`home=default|custom|unknown`), so no path ever enters the string.
+- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. A future stage that composes a new path shape therefore lands in the report as a `redaction gap` warning instead of passing silently. `writeReport()` is the only writer, and it finalizes an un-finalized report on the way to disk.
 
-What remains true: this is still best-effort filtering, not a proof. Do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
+This remains best-effort filtering, not a proof.
 
 ## Out of scope
 
@@ -64,7 +64,7 @@ const t=fs.readFileSync('.dsh-rehearsal/'+d+'/report.json','utf8');\
 console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CLEAN')"
 ```
 
-The tokens in check 3 are filled in by the reader on purpose: a documented grep that hard-codes the keywords would match the document itself.
+The `<TOKENS>` in check 3 are filled in by the reader: the document cannot pre-fill them — writing real usernames or drive letters into a public document publishes them, and a grep carrying those keywords matches this document first.
 
 ## Reporting
 

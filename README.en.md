@@ -4,7 +4,7 @@
 
 # dsh-rehearsal
 
-Upgrade rehearsal tool for DeepSeek Harness (`dsh`). It runs a candidate version against copies of your existing sessions without touching the live installation, and produces an upgrade decision report.
+Upgrade rehearsal tool for DeepSeek Harness (`dsh`). Before upgrading, it runs the candidate against copies of your existing sessions — including failures that only a real write exposes, such as a session that migrates successfully but can no longer be written back — and produces a verifiable upgrade decision report.
 
 [简体中文](README.md) | [English](README.en.md)
 
@@ -21,7 +21,7 @@ Upgrade rehearsal tool for DeepSeek Harness (`dsh`). It runs a candidate version
 
 ## What it does
 
-Two commands:
+Two core commands (plus `report` and `clean`):
 
 - **`check`** — read-only pre-flight. Resolves profiles, patch layers, lockfiles and the peer graph, and reports session format generations. Installs nothing, writes no sessions.
 - **`run`** — rehearsal. Installs the candidate into a private npm prefix, cold boots it twice in a shadow `DSH_HOME`, triggers the `v0→…→v4` migration on session copies, verifies read-side integrity, and optionally performs one write round that needs no API key.
@@ -30,14 +30,18 @@ The reason these are separate:
 
 > **A successful migration does not prove that the migrated session can still be written to.**
 
-Format migration is lazy and happens only when a session opens, and read-side checks pass data that opens but cannot be written. Upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) is exactly such a session: it opens normally and fails on every write round. The write round uses the official `@deepseek-ai/dsh-llm-replay` adapter to reconstruct model responses from that session's own recording, so it needs no API key and makes no live model request.
+Format migration is lazy and happens only when a session opens, and read-side checks pass data that opens but cannot be written. Upstream [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) is exactly such a session: it opens normally and fails on every write round. Read-side static checks cannot decide this class of corruption in principle (the row-by-row comparison is in [docs/architecture.en.md](docs/architecture.en.md#division-of-labour-with-comparable-tools)). Keyless, aimed at migrated copies of the user's own sessions, actually performing one write round — as of the 2026-10-02 check across seven comparable tools, only this tool combines all three. The write round uses the official `@deepseek-ai/dsh-llm-replay` adapter to reconstruct model responses from that session's own recording, so it needs no API key and makes no live model request.
 
-## When it is needed
+## When you need it
 
-- About to upgrade `dsh`, and worried that a plugin or peer dependency breaks on the new version? Run a read-only `check` first: dependency conflicts between every plugin and the candidate are listed finding by finding, split into newly-broken and pre-existing.
-- Session history is irreplaceable and the upgrade needs an escape hatch? The rehearsal runs entirely in a shadow `DSH_HOME`; the live installation and real sessions stay untouched, and `clean` removes every trace.
-- Will sessions in an older format generation still open after the upgrade — and still write? Opening is only the first step; `run` triggers the migration on session copies and verifies that migrated sessions can still be written back.
-- Is the upgrade decision worth a verifiable record? Every rehearsal writes `report.json` and `report.md`; verdicts come from artifacts, and reports are sanitized before they reach disk.
+- About to upgrade and want to know whether plugins or peer dependencies break on the new version: `check` lists every conflict and splits it into newly-broken and pre-existing.
+- Session history is irreplaceable and the upgrade needs an escape hatch: the rehearsal runs entirely in a shadow `DSH_HOME`; the live installation and real sessions stay untouched, and `clean` removes every trace.
+- Whether older-generation sessions still open — and still write — after the upgrade: `run` triggers the migration on session copies and verifies the write back, so "cannot write" gets a verdict instead of a guess.
+- When the decision needs a verifiable record: every rehearsal writes `report.json` and `report.md`; verdicts come from artifacts, and reports are sanitized before they reach disk.
+
+## Why a standalone CLI, not a plugin
+
+The rehearsal installs the candidate and cold-boots it under a private `DSH_HOME`. A tool living inside the profile can do neither: it is replaced along with the host, and it cannot get a private shadow environment. Timing matters more: when the profile under test cannot boot is exactly when the tool is needed most, so the tool has to stay alive. That observation comes from [`dsh-plugin-gating-hub`](https://github.com/Noob-stupid/dsh-plugin-gating-hub) (npm package name `@noob-stupid/dsh-plugin-console`, `README.zh.md:282`); this tool turns it into its install form — a standalone CLI, not a `dsh plugin add` bundle.
 
 ## Install
 
@@ -46,8 +50,6 @@ npm install -g github:wuwaka/dsh-rehearsal#v0.2.1
 ```
 
 Installed by tag; no npm account required. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
-
-A standalone CLI, deliberately not distributed as a `dsh plugin add` bundle: it has to stay usable when the profile under test cannot boot.
 
 ## Quick start
 
@@ -154,7 +156,7 @@ Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session 
 ## Development
 
 ```sh
-npm install && npm test     # 80 tests
+npm install && npm test
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 

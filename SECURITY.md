@@ -39,9 +39,9 @@
 两道结构性保障，而不是继续加正则：
 
 - **能不写路径就不写**。DSH_HOME 这类字段只写形状（`home=default|custom|unknown`），路径根本不进入字符串。
-- **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它会就地补做未执行的 `finalize()`。于是将来某个新阶段拼了新式路径时，报告自己会承认，而不是安静地带着路径发出去。
+- **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它会就地补做未执行的 `finalize()`。于是将来某个新阶段拼出未覆盖的路径形状时，报告会带着 `redaction gap` 警告落盘，而不是无声通过。
 
-仍要说清的是：这依然是尽力而为的过滤，不是证明。不要把报告文件或 `run` 输出粘贴到公开 issue。两份文件只留在磁盘上，本工具不上传任何内容。
+仍要说清的是：这依然是尽力而为的过滤，不是证明。
 
 ## 范围之外
 
@@ -64,7 +64,7 @@ const t=fs.readFileSync('.dsh-rehearsal/'+d+'/report.json','utf8');\
 console.log(['<TOKENS>','reasoning:'].filter(k=>t.includes(k)).length?'LEAK':'CLEAN')"
 ```
 
-第 3 条里的 token 由使用方自己填：把关键词写进文档，那条命令就会在文档自己身上命中。
+第 3 条里的 `<TOKENS>` 由使用方自己填：文档预填不了关键词——把真实用户名或盘符写进公开文档等于发布它们，而且带关键词的 grep 会在文档自己身上命中。
 
 ## 上报方式
 

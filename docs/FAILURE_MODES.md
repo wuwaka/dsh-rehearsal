@@ -60,13 +60,5 @@
 
 因此预设会话的写回合执行并上报（`evidence[].preset`、`coverage.writeRounds.presetAttempts` / `presetPass`），但不单独决定阶段结论：`writeRoundVerdict()`（`src/lib/drill.js:101`）仅在非预设轮上取 pass/fail；样本中只有预设可试时整阶段判 `inconclusive`。
 
-## 五、新增一条签名
-
-沿用 `dsh-plugin-lab` 的做法，但锚点改为 issue 编号：
-
-1. 在 `src/lib/drill.js` 的 `WRITE_FAIL_SIGNATURES` 或 `src/commands/run.js` 的 `BOOT_SIGNATURES` 中加 `{id, pattern, note, severity}`，`note` 写明出处（issue 编号或 `file:line`）。
-2. 在 `test/signatures.test.js` 加一对断言：真实日志行必须命中，健康日志行必须不命中。断言中的日志须取自 issue 正文或真实产物原文，不得为通过正则而编造。
-3. 在本文件对应表中新增一行，如实标注本机是否可复现。不可复现须写明原因，否则读者会误认为已验证。
-
 完整英文版见 [FAILURE_MODES.en.md](FAILURE_MODES.en.md)。两份的 `## ` 小节数与全部 `file:line` 引用由 `test/docs.test.js` 断言一致。
 

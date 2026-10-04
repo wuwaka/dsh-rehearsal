@@ -7,7 +7,7 @@
 - [ ] `npm test` is green
 - [ ] Working tree clean, nothing unexpected in `git status`
 - [ ] `.dsh-rehearsal/`, `*.tgz` and `SHA256SUMS.txt` are untracked (already covered by `.gitignore`)
-- [ ] No credentials or local paths in tracked files: `git grep -nE "<TOKENS>"` (the reader fills in the tokens; a command that hard-codes them matches the document itself)
+- [ ] No credentials or local paths in tracked files: `git grep -nE "<TOKENS>"` (`<TOKENS>` are filled in by the reader; the reason is in [SECURITY.en.md](SECURITY.en.md))
 - [ ] README and both changelogs updated
 
 ## Version
@@ -47,30 +47,10 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 
 ## After the repository is public
 
-- [ ] **npm publish**: set `NPM_TOKEN`, then `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z`. The job skips rather than failing when the secret is absent.
-      The default registry in this machine's `~/.npmrc` is a read-only mirror that answers 404 for `npm whoami` and cannot accept a publish, so publishing runs in CI or passes `--registry https://registry.npmjs.org` explicitly.
+- [ ] **npm publish**: set `NPM_TOKEN`, then `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z`. The job skips rather than failing when the secret is absent. The default registry on this machine is a read-only mirror: publish through CI or with an explicit `--registry` (see [docs/MAINTAINING.md](docs/MAINTAINING.md)).
 - [ ] **Topics**: `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`. `dsh-plugin` is a search affordance only; this repository is deliberately not a `dsh plugin add` bundle.
-- [ ] **Do not submit to the `awesome-dsh-plugin` catalogue**: its `scripts/check-submission.mjs:258-264` requires some `package.json` to declare `dsh.bundle`, and declaring only `dsh.client` is refused. `dsh-plugin-reducer` and `dsh-canary`, both external CLIs, return 0 hits across its 4,412 entries. The right listings are tool catalogues: `walkinglabs/awesome-deepseek-harness-plugins` `docs/INCLUSION_POLICY.md` rule 4, and `awesome-deepseekharness/awesome-deepseek-harness` `CONTRIBUTING.md` (🧩 Tools). Neither has been submitted as of 2026-10-03.
-- [ ] Add registry badges only once a listing exists. The `dsh-doctor` gate badge does not apply: its R/K/D gates score `dsh.bundle` packages.
+- [ ] **Catalogue submissions**: the `awesome-dsh-plugin` catalogue refuses external CLIs. The investigation, submission status and badge timing live in [docs/MAINTAINING.md](docs/MAINTAINING.md).
 - [ ] Confirm the CI badge resolves: `gh run list --repo <you>/dsh-rehearsal`.
-
-## Repository images and social preview
-
-- `assets/poster.jpg` (1774×887, 233 KB) is the poster at the top of both READMEs. The markup follows `wuwaka/dsh-clipboard-menu`: the first line inside `<div align="center">` is `<img src="assets/poster.jpg" width="620" alt="…">`, with the alt text written as a checkable description. `dsh-plugin-gating-hub` uses `width="1170"` (full content width); at 620 the poster's subtitle text reads small, and that single number is the knob.
-- `assets/social-preview.jpg` (1280×640, 153 KB) is the repository social preview image, uploaded by hand under Settings → General → Social preview. There is no endpoint for this step: checked on 2026-10-03, the REST repository object exposes no social-preview field. It controls what shows when the repository URL is shared or unfurled, not the GitHub search results list.
-- Both files regenerate from one source poster (the 1.88 MB original is not committed):
-
-  ```sh
-  python - <<'PY'
-  from PIL import Image
-  src = Image.open('poster-source.png').convert('RGB')          # 1774x887, 2:1
-  src.save('assets/poster.jpg', quality=88, optimize=True, progressive=True)
-  src.resize((1280, 640), Image.LANCZOS).save(
-      'assets/social-preview.jpg', quality=90, optimize=True, progressive=True)
-  PY
-  ```
-
-- Relative image paths generally do not resolve on the npm package page, so the poster is expected to render on GitHub only. Not verified: the package is unpublished, and this needs re-checking after the first npm publish.
 
 ## Clean branch and history
 
@@ -84,8 +64,4 @@ git commit -m "Sync clean tree: …"
 [ -z "$(git diff main publish-clean)" ] && echo "GATE OK" || echo "GATE FAIL: do not push"
 ```
 
-## Documentation rules
-
-- Every document is a bilingual pair: `README`, `CHANGELOG`, `SECURITY`, `PUBLISHING`, `AUDIT`, `docs/architecture`, `docs/FAILURE_MODES`. `test/docs.test.js` fails when a twin is missing, when `## ` section counts diverge, when the `file:line` citation sets differ, when issue numbers or commit hashes differ, when a language switch line points at a missing file, or when a document drifts back into first person.
-- Prose is impersonal, with the citation next to the claim. Verify with `grep -c` on first-person markers and `——`, not by eye.
-- Three claims depend on measurement and go stale on their own schedule: the compatibility table (separates Tested from declared, names the date, re-verify per release), the coverage table (one machine's numbers; re-measure rather than average across users), and the comparable-tools table in `docs/architecture.md` (it describes other people's repositories — re-read their source before repeating any cell).
+Maintainer knowledge (the catalogue investigation, repository images, documentation governance, the local environment, and the add-a-signature procedure) lives in [docs/MAINTAINING.md](docs/MAINTAINING.md).

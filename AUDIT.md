@@ -384,7 +384,7 @@ ls -d /c/Users/user/AppData/Local/Temp/dsh-rehearsal-home-* 2>/dev/null | wc -l 
 | P2-11 采用闸补丁 | 保持；横幅已在 c-shadow details 披露 | 运行证据 |
 | P2-12 sample 字符串 | `Number()` + 正整数校验，非法即抛 | 代码审查 |
 
-### 第三批遗留（未做项）
+### 第三批遗留（截至 2026-10-02 验收时的未做项；此后部分项已另行落地，见 CHANGELOG）
 
 - `.github/workflows/ci.yml` 三平台 CI
 - `dsh-test-drive/v1` 兼容层（当前 schema 为 `dsh-rehearsal/v1`，阶段记录仅"风格相近"）

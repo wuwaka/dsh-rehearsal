@@ -4,7 +4,7 @@
 
 # dsh-rehearsal
 
-DeepSeek Harness（`dsh`）升级预演工具。不改动当前安装，用现有会话的副本对候选版本跑一遍，输出升级决策报告。
+DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副本把候选版本完整跑一遍，包括"迁移成功但写不回去"这类只读检查发现不了的故障，输出可核验的升级决策报告。
 
 [简体中文](README.md) | [English](README.en.md)
 
@@ -21,7 +21,7 @@ DeepSeek Harness（`dsh`）升级预演工具。不改动当前安装，用现�
 
 ## 这是什么
 
-两条命令：
+核心是两条命令（另有 `report` 与 `clean`）：
 
 - **`check`** —— 只读预检。解析 profile、patch 叠层、锁文件与 peer 图，统计会话格式代际。不安装任何东西，不写任何会话。
 - **`run`** —— 预演。把候选版本装进私有 npm 前缀，在影子 `DSH_HOME` 里冷启动两次，对会话副本触发 `v0→…→v4` 迁移，校验读侧完整性，再可选执行一次无需 API 键的写回合。
@@ -30,14 +30,18 @@ DeepSeek Harness（`dsh`）升级预演工具。不改动当前安装，用现�
 
 > **迁移成功，不等于迁移后的会话还能正常写回。**
 
-格式迁移是惰性的、只在会话被打开时发生；只读校验对"能打开但写不进去"的数据会判通过。上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) 就是一份打开正常、每个写回合都失败的会话。写回合用官方 `@deepseek-ai/dsh-llm-replay` 重建该会话自己录制流中的模型响应，因此不需要 API 键，也不会发起真实的模型请求。
+格式迁移是惰性的、只在会话被打开时发生；只读校验对"能打开但写不进去"的数据会判通过。上游 [`#1229`](https://github.com/anywhere-labs/dsh-desktop/issues/1229) 就是一份打开正常、每个写回合都失败的会话。读侧静态检查对这类损坏在结构上无法判定（七个同类工具的逐项对照见 [docs/architecture.md](docs/architecture.md#与同类工具的分工)）。无键、以用户自身会话的迁移副本为对象、真的执行一次写回合——截至 2026-10-02 逐项核对，只有本工具同时做到这三件事。写回合用官方 `@deepseek-ai/dsh-llm-replay` 重建该会话自己录制流中的模型响应，因此不需要 API 键，也不会发起真实的模型请求。
 
 ## 什么时候需要它
 
-- 准备升级 `dsh`，担心插件或对等依赖在新版本上坏掉？先跑一次只读的 `check`：全部插件对候选版本的依赖冲突逐条列出，并区分"新破坏"与"既有问题"。
-- 会话历史不可替代，升级需要留退路？预演全程在影子 `DSH_HOME` 里进行，真实安装与会话原样不动，`clean` 之后不留痕迹。
-- 老格式的会话，升级后还能打开、还能写吗？打开只是第一步；`run` 对会话副本触发迁移，并验证迁移后的会话还能写回。
-- 升级决策想要可核验的依据？每次预演落盘 `report.json` 与 `report.md`，判定来自产物，报告写盘前脱敏。
+- 升级前想知道插件与 peer 依赖会不会在新版本上坏：`check` 逐条列出依赖冲突，并区分"新破坏"与"既有问题"。
+- 会话历史不可替代，升级需要退路：预演全程在影子 `DSH_HOME` 里进行，真实安装与会话原样不动，`clean` 之后不留痕迹。
+- 老格式的会话升级后还能不能打开、还能不能写：`run` 对会话副本触发迁移并验证写回，"写不进去"由此有判定，而不是靠猜。
+- 升级决策要有可核验的依据：每次预演落盘 `report.json` 与 `report.md`，判定来自产物，报告写盘前脱敏。
+
+## 为什么是独立 CLI，而不是插件
+
+预演要安装候选版本、以私有 `DSH_HOME` 冷启动它。装在 profile 里的工具做不到这两件事：它随宿主一起被替换，也拿不到私有的影子环境。更要紧的是时机：被测试的 profile 起不来时，恰是最需要工具的时刻，工具必须还活着。这一判断出自 [`dsh-plugin-gating-hub`](https://github.com/Noob-stupid/dsh-plugin-gating-hub)（npm 包名 `@noob-stupid/dsh-plugin-console`，`README.zh.md:282`）；本工具把它落成安装形态——独立 CLI，不经过 `dsh plugin add`。
 
 ## 安装
 
@@ -46,8 +50,6 @@ npm install -g github:wuwaka/dsh-rehearsal#v0.2.1
 ```
 
 按 tag 安装，不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
-
-独立 CLI，刻意不作为 `dsh plugin add` 的 bundle 分发：被测试的 profile 起不来时，它还得能用。
 
 ## 快速开始
 
@@ -154,7 +156,7 @@ Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代
 ## 开发
 
 ```sh
-npm install && npm test     # 80 个测试
+npm install && npm test
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 

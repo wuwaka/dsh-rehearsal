@@ -15,6 +15,8 @@ refuses to publish when either lacks the section for a tag.
 
 - The assumed model context window `256000` is consolidated from two magic literals (the default entry in `extractRoutes` and the fallback in the shadow settings serializer) into one named constant, `ASSUMED_CONTEXT_WINDOW_TOKENS` in `util.js`, with a regression lock: the literal is allowed only at the constant's definition (test count 80 → 81).
 - `SECURITY.md` now states the failure direction of the tool-suppression list (`TOOL_ROW_NAME_PREFIXES`): a list missing a new tool family leaves suppression incomplete but opens no execution path — the write round only replays tool calls that appear in the session's own recording and all passed the read-only allowlist, and `--allow-tools` (off by default) remains the outermost gate. A citation assertion backs it in the docs test.
+- The README states its differentiators up front: a successful migration does not prove write-back (with the reason read-side static checks cannot decide this class, and a link to the seven-tool comparison); a new "why a standalone CLI" section; use-case questions rewritten as statements; the hard-coded test count removed; `report` and `clean` named.
+- `SECURITY.md` states each boundary once: duplicate paragraphs and anthropomorphic phrasing removed. `PUBLISHING.md` is narrowed to the release runbook, with maintainer knowledge (the catalogue investigation, repository images, documentation governance, the add-a-signature procedure) moved into the new `docs/MAINTAINING.md`; the procedure moved out of `docs/FAILURE_MODES.md`, which is now pure reference.
 
 ## [0.2.1] - 2026-10-03
 
@@ -139,7 +141,7 @@ Documentation and release integrity. No behaviour change to `check` or `run`.
   throwaway prefix and running the bin; running the sources does not hit it.
 - `v0.1.0` was published as a GitHub Release with **no notes and no assets**.
   It stays as it is (immutable); this release establishes the pipeline so later
-  ones cannot be that thin.
+  releases always carry notes and assets.
 
 ## [0.1.0] - 2026-10-02
 
@@ -157,8 +159,8 @@ pre-flight, `run` for a real rehearsal in a throwaway `DSH_HOME`.
   non-reproducible `link:` / `file:` / `github:` specs.
 - **Peer findings are graded by direction**: only "satisfied today, unsatisfied
   in the candidate" is blocking `high`; both-unsatisfied is recorded as
-  `pre-existing`, because a mismatch that already exists today is not this
-  upgrade's fault.
+  `pre-existing`, because a mismatch that already exists today was not
+  introduced by this upgrade.
 - **`run --to <version>`** — installs the candidate into a private npm prefix,
   boots it twice, copies real sessions into a shadow home, triggers the lazy
   `v0→…→v4` migration on those copies, verifies read-side integrity, then
