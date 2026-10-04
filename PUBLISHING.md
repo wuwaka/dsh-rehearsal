@@ -43,7 +43,7 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 - [ ] `draft=false`，`isPrerelease` 与 tag 形态一致
 - [ ] 附件为 `dsh-rehearsal-X.Y.Z.tgz` 与 `.tgz.sha256`
 - [ ] 下载后 `sha256sum -c` 通过
-- [ ] `npm install -g github:<you>/dsh-rehearsal#vX.Y.Z` 与 tarball 两条安装路径都能装出可执行的 bin
+- [ ] 三条安装路径都能装出可执行的 bin：`npm install -g dsh-rehearsal`、`npm install -g github:<you>/dsh-rehearsal#vX.Y.Z`、tarball
 
 ## 仓库公开之后
 

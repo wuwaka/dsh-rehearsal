@@ -10,9 +10,11 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 
 [![license](https://img.shields.io/badge/license-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![release](https://img.shields.io/github/v/release/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/releases)
+[![npm](https://img.shields.io/npm/v/dsh-rehearsal?style=flat-square)](https://www.npmjs.com/package/dsh-rehearsal)
 [![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
 [![stars](https://img.shields.io/github/stars/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/stargazers)
 [![topic](https://img.shields.io/badge/topic-dsh-4d6bfe?style=flat-square)](https://github.com/topics/dsh)
+[![listed](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness-4d6bfe?style=flat-square)](https://github.com/Dominic789654/awesome-deepseek-harness#session--memory-management)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
 </div>
@@ -46,10 +48,11 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 ## 安装
 
 ```sh
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.1
+npm install -g dsh-rehearsal                        # npm registry
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.1   # 或固定到 GitHub tag
 ```
 
-按 tag 安装，不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
+两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
 
 ## 快速开始
 

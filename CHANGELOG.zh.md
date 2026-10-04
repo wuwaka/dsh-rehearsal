@@ -19,6 +19,8 @@
 - `SECURITY.md` 同一边界只说一次：删除重复段落与拟人表述。`PUBLISHING.md` 收敛为发布操作手册，
   维护者知识（目录投稿调查、仓库图片、文档治理、新增签名的步骤）移入新增的 `docs/MAINTAINING.md`；
   `docs/FAILURE_MODES.md` 的「新增一条签名」一并移入，正文收敛为纯 reference。
+- README 安装节增加 npm registry 路径（`dsh-rehearsal@0.2.1` 已于 2026-10-03 发布）；徽章区新增
+  npm 版本徽章与 `listed in awesome-deepseek-harness` 收录徽章（`Dominic789654/awesome-deepseek-harness#579` 已合并）。
 
 ## [0.2.1] - 2026-10-03
 

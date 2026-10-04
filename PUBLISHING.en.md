@@ -43,7 +43,7 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 - [ ] `draft=false`, and `isPrerelease` matches the tag shape
 - [ ] Assets are `dsh-rehearsal-X.Y.Z.tgz` and `.tgz.sha256`
 - [ ] `sha256sum -c` passes after downloading
-- [ ] Both install paths produce a working executable: `npm install -g github:<you>/dsh-rehearsal#vX.Y.Z`, and the tarball
+- [ ] All three install paths produce a working executable: `npm install -g dsh-rehearsal`, `npm install -g github:<you>/dsh-rehearsal#vX.Y.Z`, and the tarball
 
 ## After the repository is public
 

@@ -17,6 +17,7 @@ refuses to publish when either lacks the section for a tag.
 - `SECURITY.md` now states the failure direction of the tool-suppression list (`TOOL_ROW_NAME_PREFIXES`): a list missing a new tool family leaves suppression incomplete but opens no execution path — the write round only replays tool calls that appear in the session's own recording and all passed the read-only allowlist, and `--allow-tools` (off by default) remains the outermost gate. A citation assertion backs it in the docs test.
 - The README states its differentiators up front: a successful migration does not prove write-back (with the reason read-side static checks cannot decide this class, and a link to the seven-tool comparison); a new "why a standalone CLI" section; use-case questions rewritten as statements; the hard-coded test count removed; `report` and `clean` named.
 - `SECURITY.md` states each boundary once: duplicate paragraphs and anthropomorphic phrasing removed. `PUBLISHING.md` is narrowed to the release runbook, with maintainer knowledge (the catalogue investigation, repository images, documentation governance, the add-a-signature procedure) moved into the new `docs/MAINTAINING.md`; the procedure moved out of `docs/FAILURE_MODES.md`, which is now pure reference.
+- The install section gains the npm registry path (`dsh-rehearsal@0.2.1` was published on 2026-10-03); the badge row gains the npm version badge and a `listed in awesome-deepseek-harness` badge (`Dominic789654/awesome-deepseek-harness#579` merged).
 
 ## [0.2.1] - 2026-10-03
 

@@ -8,7 +8,7 @@
 
 - `awesome-dsh-plugin` 拒收外部 CLI：其 `scripts/check-submission.mjs:258-264` 要求某个 `package.json` 声明 `dsh.bundle`，只声明 `dsh.client` 亦被拒。同为外部 CLI 的 `dsh-plugin-reducer`、`dsh-canary` 在该目录 4,412 条中 0 命中。
 - 投稿状态（2026-10-04）：`Dominic789654/awesome-deepseek-harness#579`（359★，条目在 Session & Memory Management）**已合并**；`0xsline/awesome-deepseek-harness#679`（1,133★，Runtime & Operations）与 `Zhiyuan-Fan/Awesome-DeepSeek-Harness-Plugins#85`（569★，Sessions & Storage 表格）在审。三个 PR 均为双语条目同一 PR，收到审核意见需按各清单 contributing 规则跟进。收录目录的可选 `tarball` 键要求 https、GitHub Release 托管、`.tgz` 结尾——Release 附件（tarball + `.sha256`）已是这个形状。
-- 徽章时机：有收录之后再加注册表徽章；`dsh-doctor` 的门禁徽章不适用（其 R/K/D 门评分 `dsh.bundle` 包）。
+- 徽章：已加（2026-10-04）——npm 版本徽章，与 `listed in awesome-deepseek-harness`（锚到 Session & Memory Management 小节；`Dominic789654/awesome-deepseek-harness#579` 已合并）。其余两处在审目录（`0xsline#679`、`Zhiyuan-Fan#85`）合并后再决定是否换指向。`dsh-doctor` 的门禁徽章不适用（其 R/K/D 门评分 `dsh.bundle` 包）。
 
 ## 仓库图片与社交预览
 
@@ -38,6 +38,12 @@
 ## 本机环境
 
 - `~/.npmrc` 默认 registry 是只读镜像，对 `npm whoami` 返回 404 且不接受发布：发布走 CI，或显式加 `--registry https://registry.npmjs.org`。
+
+## npm registry 状态
+
+- `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
+- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除。
+- `package.json` 的 `keywords` 含 `dsh-plugin`，而 GitHub topics 刻意不含（生态反爬虫清单会剔除蹭标签的非插件）——两处口径目前不一致；对齐与否待定，keywords 改动要随下次发布才生效。
 
 ## 新增一条失效签名
 
