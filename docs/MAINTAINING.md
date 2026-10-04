@@ -42,7 +42,8 @@
 ## npm registry 状态
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
-- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除。
+- **`v0.2.2`（2026-10-04）GitHub Release 已切齐**（tag `56e95f7`，附件 tgz + `.sha256`），但同日 CI 的 npm 发布被拒：账号 wuwakala 因"近期安全敏感操作"被 npm **临时暂停**（`E403 … temporarily suspended`，此前 24 小时内有 passkey/TOTP 与 token 增删）。解除暂停后重跑 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD，无需重打 tag；keywords 移除 `dsh-plugin` 的改动已随该提交固定，重跑时一并生效。
+- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——账号暂停解除后与上面的确认在同一会话里顺手处理。
 - `package.json` 的 `keywords` 仍含过时的 `dsh-plugin`（GitHub topics 刻意不含——生态反爬虫清单会剔除蹭标签的非插件）：已定在下次发版把它换成 `dsh`；keywords 只在 publish 时生效。
 
 ## 新增一条失效签名
