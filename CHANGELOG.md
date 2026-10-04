@@ -11,6 +11,10 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-04
+
+Documentation, badges and install metadata, plus one internal constant consolidation. The behaviour of `check` and `run` is **unchanged**.
+
 ### Changed
 
 - The assumed model context window `256000` is consolidated from two magic literals (the default entry in `extractRoutes` and the fallback in the shadow settings serializer) into one named constant, `ASSUMED_CONTEXT_WINDOW_TOKENS` in `util.js`, with a regression lock: the literal is allowed only at the constant's definition (test count 80 → 81).
@@ -18,6 +22,7 @@ refuses to publish when either lacks the section for a tag.
 - The README states its differentiators up front: a successful migration does not prove write-back (with the reason read-side static checks cannot decide this class, and a link to the seven-tool comparison); a new "why a standalone CLI" section; use-case questions rewritten as statements; the hard-coded test count removed; `report` and `clean` named.
 - `SECURITY.md` states each boundary once: duplicate paragraphs and anthropomorphic phrasing removed. `PUBLISHING.md` is narrowed to the release runbook, with maintainer knowledge (the catalogue investigation, repository images, documentation governance, the add-a-signature procedure) moved into the new `docs/MAINTAINING.md`; the procedure moved out of `docs/FAILURE_MODES.md`, which is now pure reference.
 - The install section gains the npm registry path (`dsh-rehearsal@0.2.1` was published on 2026-10-03); the badge row gains the npm version badge and a `listed in awesome-deepseek-harness` badge (`Dominic789654/awesome-deepseek-harness#579` merged).
+- The npm `keywords` drop `dsh-plugin`, aligning with the GitHub topics convention (anti-spam crawlers strip non-plugins carrying that tag).
 
 ## [0.2.1] - 2026-10-03
 
@@ -232,7 +237,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.1.0

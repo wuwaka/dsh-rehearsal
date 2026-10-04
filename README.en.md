@@ -49,7 +49,7 @@ The rehearsal installs the candidate and cold-boots it under a private `DSH_HOME
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.1   # or pin to a GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.2.2   # or pin to a GitHub tag
 ```
 
 Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).

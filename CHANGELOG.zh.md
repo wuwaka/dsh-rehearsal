@@ -9,6 +9,10 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-04
+
+文档、徽章与安装元数据，外加一处内部常量收敛。`check` 与 `run` 的行为**没有任何改动**。
+
 ### 变更
 
 - 假设的模型上下文窗口 `256000` 从两处魔数（`extractRoutes` 造默认模型条目、影子 settings 序列化的兜底）收敛为 `util.js` 的命名常量 `ASSUMED_CONTEXT_WINDOW_TOKENS`，并加回归锁：该字面量只允许出现在常量定义处（测试数 80 → 81）。
@@ -21,6 +25,7 @@
   `docs/FAILURE_MODES.md` 的「新增一条签名」一并移入，正文收敛为纯 reference。
 - README 安装节增加 npm registry 路径（`dsh-rehearsal@0.2.1` 已于 2026-10-03 发布）；徽章区新增
   npm 版本徽章与 `listed in awesome-deepseek-harness` 收录徽章（`Dominic789654/awesome-deepseek-harness#579` 已合并）。
+- npm `keywords` 移除 `dsh-plugin`，与 GitHub topics 的口径对齐（生态反爬虫清单会剔除蹭该标签的非插件）。
 
 ## [0.2.1] - 2026-10-03
 
@@ -175,7 +180,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.1.0
