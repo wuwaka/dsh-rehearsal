@@ -43,7 +43,7 @@
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
 - dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除。
-- `package.json` 的 `keywords` 含 `dsh-plugin`，而 GitHub topics 刻意不含（生态反爬虫清单会剔除蹭标签的非插件）——两处口径目前不一致；对齐与否待定，keywords 改动要随下次发布才生效。
+- `package.json` 的 `keywords` 仍含过时的 `dsh-plugin`（GitHub topics 刻意不含——生态反爬虫清单会剔除蹭标签的非插件）：已定在下次发版把它换成 `dsh`；keywords 只在 publish 时生效。
 
 ## 新增一条失效签名
 
