@@ -10,6 +10,7 @@
 
 | 保证 | 位置 |
 |---|---|
+| 真实 home 与桌面宿主安装目录只读：home 发现、会话发现与版本探测只做文件解析；全部写入只落在影子 home 与 `.dsh-rehearsal` 产物目录 | `src/lib/dshhome.js`、`src/lib/desktops.js` |
 | 预演不向活动 profile 安装任何内容；候选版本装入私有 npm 前缀，`DSH_HOME` 指向别处 | `src/lib/shadow.js` `installCandidate` |
 | 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
 | 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:66-85` |
@@ -38,7 +39,7 @@
 
 两道结构性保障，而不是继续加正则：
 
-- **能不写路径就不写**。DSH_HOME 这类字段只写形状（`home=default|custom|unknown`），路径根本不进入字符串。
+- **能不写路径就不写**。DSH_HOME 这类字段只写形状或来源（`home=default|custom|desktop:<host-id>|unknown`），路径根本不进入字符串。
 - **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它会就地补做未执行的 `finalize()`。于是将来某个新阶段拼出未覆盖的路径形状时，报告会带着 `redaction gap` 警告落盘，而不是无声通过。
 
 仍要说清的是：这依然是尽力而为的过滤，不是证明。

@@ -26,7 +26,7 @@
   PY
   ```
 
-- 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。此点未实测（包尚未发布），发布后需复核。
+- 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。`dsh-rehearsal@0.2.1` 起已在 registry（2026-10-03）；npm 前端的实际渲染截至 2026-10-05 仍未复核（npmjs.com 对脚本请求返回 403，需要浏览器人工看一眼）。
 
 ## 文档治理
 
@@ -39,12 +39,17 @@
 
 - `~/.npmrc` 默认 registry 是只读镜像，对 `npm whoami` 返回 404 且不接受发布：发布走 CI，或显式加 `--registry https://registry.npmjs.org`。
 
+## 桌面宿主探测环境
+
+- 本机装有官方 DeepSeek Harness Desktop 0.2.0-rc.2（`%LOCALAPPDATA%\Programs\DeepSeek Harness`，`/S` 静默安装，**从未启动**——官方与社区版共用 `~/.dsh/profiles/desktop`，启动任何一方都会改写另一方管理的 profile）。它是 v0.3.0 探测链的实测来源：asar 头部 3,392,064 B、真实 `dsh/desktop-runtime.json` 样本、`versionsEqual=true` 约束的复验都出自它；探针脚本与提取产物在 `%TEMP%\dsh-official-probe\`（临时目录，清理无碍）。
+- 待办：卸载官方版（`"%LOCALAPPDATA%\Programs\DeepSeek Harness\Uninstall DeepSeek Harness.exe" /S`）后重跑一次 `check` 完成卸载态验收（current 应仍为 0.2.0-rc.2，来源切到社区 bundle）；之后清理 `..\dsh-desktop-research\`（五个上游克隆，基线提交见 architecture.md 的探测表一节）。
+
 ## npm registry 状态
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
-- **`v0.2.2`（2026-10-04）GitHub Release 已切齐**（tag `56e95f7`，附件 tgz + `.sha256`），但同日 CI 的 npm 发布被拒：npm 因**一次恢复码登录**（2026-10-03 本机过桥登录）自动暂停账号 72 小时（`E403 … temporarily suspended`，官方邮件确认，属保护性暂停而非盗号）。账号于 **2026-10-06 08:02 UTC** 自动恢复；届时重跑 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD，无需重打 tag，keywords 移除 `dsh-plugin` 一并生效。
-- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——账号暂停解除后与上面的确认在同一会话里顺手处理。
-- `package.json` 的 `keywords` 仍含过时的 `dsh-plugin`（GitHub topics 刻意不含——生态反爬虫清单会剔除蹭标签的非插件）：已定在下次发版把它换成 `dsh`；keywords 只在 publish 时生效。
+- **`v0.3.0`（2026-10-05）GitHub Release 已切齐**（提交 `f88a343` + `605c2c3`，CI 六组合全绿，附件 tgz + `.sha256` 并已下载复验 sha256），但同日 npm 发布仍被账号暂停拒绝（见下）。**`0.2.2` 因此不会上 npm registry**，只以 GitHub Release 附件存在。
+- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.0），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。
+- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——与上面那次 dispatch 同一会话顺手处理。
 
 ## 新增一条失效签名
 

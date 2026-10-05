@@ -10,6 +10,7 @@ The properties below are enforced in code and covered by tests. A report that an
 
 | Guarantee | Where |
 |---|---|
+| The real home and desktop install directories are read-only: home discovery, session discovery and version probing only parse files; every write lands in the shadow home or the `.dsh-rehearsal` artifact directory | `src/lib/dshhome.js`, `src/lib/desktops.js` |
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
 | No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:66-85` |
@@ -38,7 +39,7 @@ Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse 
 
 Two structural guarantees rather than more regexes:
 
-- **a path is written only when the path is the fact**. Fields such as DSH_HOME record a shape (`home=default|custom|unknown`), so no path ever enters the string.
+- **shapes instead of paths**. Fields such as DSH_HOME record a shape or an origin (`home=default|custom|desktop:<host-id>|unknown`), so no path ever enters the string.
 - **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. A future stage that composes a new path shape therefore lands in the report as a `redaction gap` warning instead of passing silently. `writeReport()` is the only writer, and it finalizes an un-finalized report on the way to disk.
 
 This remains best-effort filtering, not a proof.

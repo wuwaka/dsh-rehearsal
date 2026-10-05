@@ -37,6 +37,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 ## 什么时候需要它
 
 - 升级前想知道插件与 peer 依赖会不会在新版本上坏：`check` 逐条列出依赖冲突，并区分"新破坏"与"既有问题"。
+- 官方桌面或社区桌面（如 AnywhereLab 的 DSH Desktop）托管着会话，升级前不想手工搬 home：省略 `--home`，`check` 与 `run` 会自动发现并验证已登记桌面宿主的 home，报告写明来源。
 - 会话历史不可替代，升级需要退路：预演全程在影子 `DSH_HOME` 里进行，真实安装与会话原样不动，`clean` 之后不留痕迹。
 - 老格式的会话升级后还能不能打开、还能不能写：`run` 对会话副本触发迁移并验证写回，"写不进去"由此有判定，而不是靠猜。
 - 升级决策要有可核验的依据：每次预演落盘 `report.json` 与 `report.md`，判定来自产物，报告写盘前脱敏。
@@ -49,7 +50,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.2   # 或固定到 GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.0   # 或固定到 GitHub tag
 ```
 
 两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
@@ -109,7 +110,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 
 迁移覆盖与写回合覆盖是两件事，不要互换引用。写回合只覆盖"录制中出现过的工具全部为只读"的会话。
 
-一次 Windows 运行的实测：
+一次 Windows 运行的实测（2026-10-02）：
 
 | | 会话数 | 占比 |
 |---|---:|---:|
@@ -123,6 +124,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 
 - 候选版本装入私有 npm 前缀，`DSH_HOME` 指向影子目录。
 - 会话副本的 `cwd` 重写入影子工作区。
+- 真实 home 与桌面宿主安装目录只读；发现与探测只做文件解析。
 - 形如凭据的环境变量全部剔除，遥测强制关闭。
 - 历史工具调用默认不执行（fail-closed 只读允许清单）。
 - 报告写盘前脱敏；影子数据除 `--keep` 外一律清理。
@@ -165,4 +167,4 @@ node src/cli.js check --candidate 0.2.0-rc.2
 
 CI 跑 `npm ci` + `npm test`，矩阵 windows / macOS / linux × Node 22.19 / 24.x。CI 不跑 `run`：它会安装约 500 个包并重放会话副本，在共享 runner 上既不确定也不合适。发布流程见 [PUBLISHING.md](PUBLISHING.md)。
 
-MIT License。与 DeepSeek 无关联、未获其背书。上游 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)；桌面宿主与活跃缺陷跟踪 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。
+MIT License。与 DeepSeek 无关联、未获其背书。上游 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（官方桌面在其 `apps/desktop`）；社区桌面宿主与活跃缺陷跟踪 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。

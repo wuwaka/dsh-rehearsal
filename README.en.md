@@ -37,6 +37,7 @@ Format migration is lazy and happens only when a session opens, and read-side ch
 ## When you need it
 
 - About to upgrade and want to know whether plugins or peer dependencies break on the new version: `check` lists every conflict and splits it into newly-broken and pre-existing.
+- Sessions are managed by the official desktop or a community desktop (such as AnywhereLab's DSH Desktop) and the upgrade should not involve hand-carrying a home around: omit `--home` and `check` / `run` discover and validate the registered desktop hosts' homes, with the origin stated in the report.
 - Session history is irreplaceable and the upgrade needs an escape hatch: the rehearsal runs entirely in a shadow `DSH_HOME`; the live installation and real sessions stay untouched, and `clean` removes every trace.
 - Whether older-generation sessions still open — and still write — after the upgrade: `run` triggers the migration on session copies and verifies the write back, so "cannot write" gets a verdict instead of a guess.
 - When the decision needs a verifiable record: every rehearsal writes `report.json` and `report.md`; verdicts come from artifacts, and reports are sanitized before they reach disk.
@@ -49,7 +50,7 @@ The rehearsal installs the candidate and cold-boots it under a private `DSH_HOME
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.2.2   # or pin to a GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.0   # or pin to a GitHub tag
 ```
 
 Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
@@ -109,7 +110,7 @@ Every rehearsal writes two files: `report.json` (machine-readable) and `report.m
 
 Migration coverage and write-round coverage are different, and must not be quoted interchangeably. A write round only covers sessions whose recorded tools are all read-only.
 
-Measured on one Windows run:
+Measured on one Windows run (2026-10-02):
 
 | | Sessions | Share |
 |---|---:|---:|
@@ -123,6 +124,7 @@ The write-round share is not migration coverage. Per-session coverage is in the 
 
 - The candidate is installed into a private npm prefix, with `DSH_HOME` pointed at a shadow home.
 - Session copies have their `cwd` rewritten into the shadow workspace.
+- The real home and desktop install directories are read-only; discovery and probing only parse files.
 - Credential-shaped environment variables are stripped, and telemetry is force-disabled.
 - Recorded tool calls do not execute by default (fail-closed read-only allowlist).
 - Reports are sanitized before being written, and shadow data is removed unless `--keep` is used.
@@ -165,4 +167,4 @@ node src/cli.js check --candidate 0.2.0-rc.2
 
 CI runs `npm ci` + `npm test` across windows / macOS / linux × Node 22.19 / 24.x. CI does not run `run`: that command installs roughly 500 packages and replays session copies, which is neither deterministic nor appropriate on a shared runner. Release procedure: [PUBLISHING.en.md](PUBLISHING.en.md).
 
-MIT License. Not affiliated with or endorsed by DeepSeek. Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness); the Desktop host and active issue tracker: [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).
+MIT License. Not affiliated with or endorsed by DeepSeek. Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) (the official desktop lives in its `apps/desktop`); community desktop host and active issue tracker: [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).
