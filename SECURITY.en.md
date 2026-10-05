@@ -15,7 +15,7 @@ The properties below are enforced in code and covered by tests. A report that an
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
 | No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:66-85` |
 | Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:85` |
-| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:210`; a separate test greps the finished report for home paths and reasoning markers |
+| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings; a scrub that fails the invariant makes `writeReport()` refuse to write | `src/lib/report.js:210`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
 | The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
 

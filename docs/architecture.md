@@ -44,7 +44,7 @@ patch 叠层按 `dsh.profile.bundles` 顺序 → profile 的 `cordis.patch.yml` 
 
 profile 不默认取 `web`：自动识别当前使用者。一台机器上 `desktop` profile 有 11 个 bundle、198 行 patch，`web` 只有 4 个 bundle / 4 行 patch，选错对象会让整份结论失效。
 
-peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断性 `high`；两侧都不满足的记 `pre-existing`。今天就已经错配的配置不是本次升级引入的。枚举式 peer 范围（`^0.1.7-rc.2` 不匹配 `0.2.0-rc.2`）与 `link:` / `file:` / `github:` 依赖单独标注，因为前者使 prerelease 升级必须逐版手写范围，后者不可复现。
+peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断性 `high`；两侧都不满足的记 `pre-existing`。今天就已经错配的配置不是本次升级引入的。枚举式 peer 范围（`^0.1.7-rc.2` 不匹配 `0.2.0-rc.2`）与 `link:` / `file:` / `github:` 依赖单独标注，因为前者使 prerelease 升级必须逐版手写范围，后者不可复现。无法评估的 peer 范围——manifest 里的非字符串值，或不是合法 semver 的字符串——记 `peer-range-unparseable` 警告：属未知，既不算满足也不算阻断。
 
 ## `run` 的阶段流水线
 

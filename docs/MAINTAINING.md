@@ -41,7 +41,7 @@
 
 ## 桌面宿主探测环境
 
-- 本机装有官方 DeepSeek Harness Desktop 0.2.0-rc.2（`%LOCALAPPDATA%\Programs\DeepSeek Harness`，`/S` 静默安装，**从未启动**——官方与社区版共用 `~/.dsh/profiles/desktop`，启动任何一方都会改写另一方管理的 profile）。它是 v0.3.0/0.3.1 探测链的实测来源：asar 头部 3,392,064 B、真实 `dsh/desktop-runtime.json` 样本、`versionsEqual=true` 约束的复验都出自它；探针脚本与提取产物在 `%TEMP%\dsh-official-probe\`（临时目录，清理无碍）。
+- 本机装有官方 DeepSeek Harness Desktop 0.2.0-rc.2（`%LOCALAPPDATA%\Programs\DeepSeek Harness`，`/S` 静默安装，**从未启动**——官方与社区版共用 `~/.dsh/profiles/desktop`，启动任何一方都会改写另一方管理的 profile）。它是 v0.3.x 探测链的实测来源：asar 头部 3,392,064 B、真实 `dsh/desktop-runtime.json` 样本、`versionsEqual=true` 约束的复验都出自它；探针脚本与提取产物在 `%TEMP%\dsh-official-probe\`（临时目录，清理无碍）。
 - 待办：卸载官方版（`"%LOCALAPPDATA%\Programs\DeepSeek Harness\Uninstall DeepSeek Harness.exe" /S`）后重跑一次 `check` 完成卸载态验收（current 应仍为 0.2.0-rc.2，来源切到社区 bundle）；之后清理 `..\dsh-desktop-research\`（五个上游克隆，基线提交见 architecture.md 的探测表一节）。
 
 ## npm registry 状态

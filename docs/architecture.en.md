@@ -44,7 +44,7 @@ Patch layers resolve in order: `dsh.profile.bundles` → the profile's `cordis.p
 
 The profile is auto-detected rather than defaulting to `web`. On one machine the `desktop` profile carried 11 bundles and 198 patch lines while `web` had 4 bundles / 4 patch lines; analysing the wrong target invalidates every conclusion.
 
-Peer mismatches are graded by direction: only "satisfied today, unsatisfied in the candidate" is a blocking `high`. A mismatch unsatisfied on both sides is recorded as `pre-existing` — configuration that already disagrees today was not introduced by this upgrade. Enumerated peer ranges (`^0.1.7-rc.2` does not match `0.2.0-rc.2`) and `link:` / `file:` / `github:` dependencies are flagged separately, because the former forces authors to hand-list every prerelease and the latter are not reproducible.
+Peer mismatches are graded by direction: only "satisfied today, unsatisfied in the candidate" is a blocking `high`. A mismatch unsatisfied on both sides is recorded as `pre-existing` — configuration that already disagrees today was not introduced by this upgrade. Enumerated peer ranges (`^0.1.7-rc.2` does not match `0.2.0-rc.2`) and `link:` / `file:` / `github:` dependencies are flagged separately, because the former forces authors to hand-list every prerelease and the latter are not reproducible. A range that cannot be evaluated — a non-string value in the manifest, or a string that is not valid semver — is recorded as a `peer-range-unparseable` warning: unknown, neither satisfied nor blocking.
 
 ## The `run` pipeline
 

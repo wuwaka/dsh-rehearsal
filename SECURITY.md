@@ -15,7 +15,7 @@
 | 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
 | 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:66-85` |
 | 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:85` |
-| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:210`；另有测试对最终报告 grep 家目录与推理标记 |
+| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings；`privacy.scrubbed` 不为真时 `writeReport()` 拒绝写盘 | `src/lib/report.js:210`；另有测试对最终报告 grep 家目录与推理标记 |
 | 默认同时按行 id 与包名前缀抑制工具提供方；仅当会话历史中的全部工具都在只读允许清单内时才演练（fail-closed） | `src/lib/shadow.js`、`src/lib/drill.js` |
 | 影子 home 内含明文会话副本，所有退出路径都会删除，结果记录为 `shadowCleanup` | `src/commands/run.js` |
 
