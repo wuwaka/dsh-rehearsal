@@ -403,7 +403,7 @@ export async function cmdRun(opts) {
         const v4z = path.join(shadowHome, 'sessions', s.shadowWsName ?? s.workspaceDirName, s.sessionId, 'session.v4.jsonl.zstd');
         const fixture = path.join(shadowHome, `fixture-${s.sessionId}.jsonl`);
         // v4 logs are MULTI-FRAME zstd: naive zstdDecompressSync silently
-        // reads only the first frame (the trap zfstd.js exists for).
+        // reads only the first frame (which is why zfstd.js exists).
         fs.writeFileSync(fixture, decodeAll(fs.readFileSync(v4z)));
         fixtureBySession.set(s.sessionId, fixture);
         const text = fs.readFileSync(fixture, 'utf8');

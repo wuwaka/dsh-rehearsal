@@ -9,6 +9,7 @@ import path from 'node:path';
 import { cmdCheck, writeArtifacts } from './commands/check.js';
 import { cmdRun } from './commands/run.js';
 import { isOwnedArtifactsDir, isDangerousTarget } from './lib/util.js';
+import { parseArgs } from './lib/args.js';
 
 const USAGE = `dsh-rehearsal — upgrade rehearsal CLI for DeepSeek Harness (dsh)
 
@@ -63,20 +64,6 @@ Safety rules baked in:
   - --shadow-dir / --prefix-dir are never auto-cleaned (a shadow dir holds
     plaintext session copies); clean --yes only removes the default directory
 `;
-
-function parseArgs(argv) {
-  const opts = { _: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a.startsWith('--')) {
-      const eq = a.indexOf('=');
-      if (eq > 0) opts[a.slice(2, eq)] = a.slice(eq + 1);
-      else if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) opts[a.slice(2)] = argv[++i];
-      else opts[a.slice(2)] = true;
-    } else opts._.push(a);
-  }
-  return opts;
-}
 
 async function main() {
   const [, , cmd, ...rest] = process.argv;

@@ -8,8 +8,7 @@
 /**
  * Count patch rows.
  *
- * Round-3 correction (the auditor retracted their original claim and our
- * any-indent fix over-corrected). Real desktop `cordis.patch.yml` anatomy:
+ * Real desktop `cordis.patch.yml` anatomy:
  *  - 14 rows: `- id:` at column 0
  *  - 12 INDENTED `- id:` at indent 10 inside `providers: > opencode: >
  *    models:` — CONFIG ENTRIES (big-pickle / mimo-v2.5 / deepseek-flash),

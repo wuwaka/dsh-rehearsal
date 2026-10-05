@@ -16,6 +16,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const CLI = path.join(import.meta.dirname, '..', 'src', 'cli.js');
+const { parseArgs } = await import('../src/lib/args.js');
 
 function buildFixture(t) {
   const home = fs.mkdtempSync(path.join(os.homedir(), 'dsh-rehearsal-fixture-'));
@@ -170,6 +171,61 @@ test('check distinguishes a candidate that newly breaks peers from one that is a
 
 });
 
+test('parseArgs stores every dashed flag under both spellings, and switches never lie (round 7)', () => {
+  // the parser used to store kebab keys while run.js read camelCase, so
+  // --shadow-dir / --prefix-dir / --skip-write from the CLI were ignored
+  assert.equal(parseArgs(['--shadow-dir', 'X']).shadowDir, 'X');
+  assert.equal(parseArgs(['--shadow-dir', 'X'])['shadow-dir'], 'X');
+  assert.equal(parseArgs(['--prefix-dir', 'Y']).prefixDir, 'Y');
+  assert.equal(parseArgs(['--skip-write']).skipWrite, true);
+  // switches parse their value explicitly; a string "false" is never truthy
+  assert.equal(parseArgs(['--run-scripts=false']).runScripts, false);
+  assert.equal(parseArgs(['--run-scripts=true']).runScripts, true);
+  assert.throws(() => parseArgs(['--run-scripts=maybe']), /takes no value/, 'ambiguous switch values are input errors');
+  // switches never consume the following argument
+  assert.equal(parseArgs(['--keep', '--yes']).keep, true);
+  assert.deepEqual(parseArgs(['check', '--home', '/x'])._, ['check']);
+});
+
+test('CLI boolean values are honoured: --yes=false does not delete (round 7)', (t) => {
+  const parent = fs.mkdtempSync(path.join(os.homedir(), 'dsh-rehearsal-bool-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const owned = path.join(parent, 'owned');
+  fs.mkdirSync(owned, { recursive: true });
+  fs.writeFileSync(path.join(owned, '.dsh-rehearsal-owner'), 'dsh-rehearsal-artifact-v1\n');
+  fs.writeFileSync(path.join(owned, 'report.json'), '{}');
+
+  const no = runCli(['clean', '--artifacts', owned, '--yes=false']);
+  assert.equal(no.status, 0, no.stderr);
+  assert.match(no.stdout, /would remove/, '--yes=false must read as "not confirmed"');
+  assert.ok(fs.existsSync(owned), 'nothing is deleted without an explicit yes');
+
+  const bad = runCli(['clean', '--artifacts', owned, '--yes=maybe']);
+  assert.equal(bad.status, 3);
+  assert.match(bad.stderr, /takes no value/);
+  assert.ok(fs.existsSync(owned));
+});
+
+test('--shadow-dir / --prefix-dir from the CLI actually reach the ownership gate (round 7)', (t) => {
+  const home = buildFixture(t);
+  const parent = fs.mkdtempSync(path.join(os.homedir(), 'dsh-rehearsal-clidir-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const foreignShadow = path.join(parent, 'foreign-shadow');
+  fs.mkdirSync(foreignShadow, { recursive: true });
+  fs.writeFileSync(path.join(foreignShadow, 'user-data.txt'), 'x');
+  const r1 = runCli(['run', '--to', '0.2.0-rc.2', '--home', home, '--shadow-dir', foreignShadow, '--artifacts', path.join(parent, 'art1')]);
+  assert.equal(r1.status, 3, `--shadow-dir must be honoured, got ${r1.status}: ${r1.stdout}${r1.stderr}`);
+  assert.match(r1.stderr, /ownership marker/);
+  assert.ok(fs.existsSync(path.join(foreignShadow, 'user-data.txt')), 'foreign data untouched');
+
+  const foreignPrefix = path.join(parent, 'foreign-prefix');
+  fs.mkdirSync(foreignPrefix, { recursive: true });
+  fs.writeFileSync(path.join(foreignPrefix, 'user-data.txt'), 'x');
+  const r2 = runCli(['run', '--to', '0.2.0-rc.2', '--home', home, '--prefix-dir', foreignPrefix, '--artifacts', path.join(parent, 'art2')]);
+  assert.equal(r2.status, 3, `--prefix-dir must be honoured, got ${r2.status}: ${r2.stdout}${r2.stderr}`);
+  assert.match(r2.stderr, /ownership marker/);
+});
+
 test('unknown command and bad report path exit 3', () => {
   assert.equal(runCli(['nope']).status, 3);
   assert.equal(runCli(['report', path.join(os.tmpdir(), 'definitely-not-here-' + Date.now())]).status, 3);
@@ -232,11 +288,24 @@ test('clean only removes owned artifact directories (review round 6)', (t) => {
   assert.ok(!fs.existsSync(agg));
 
   // legacy default layout from pre-marker versions stays cleanable — the
-  // run directories carry the version in their real name
+  // run directories carry the version in their real name, and each child
+  // must carry its report (structure, not just naming)
   const legacy = path.join(parent, '.dsh-rehearsal');
-  fs.mkdirSync(path.join(legacy, 'run-0.2.0-rc.2-999'), { recursive: true });
+  const legacyChild = path.join(legacy, 'run-0.2.0-rc.2-999');
+  fs.mkdirSync(legacyChild, { recursive: true });
+  fs.writeFileSync(path.join(legacyChild, 'report.json'), '{}');
   assert.equal(runCli(['clean', '--artifacts', legacy, '--yes']).status, 0);
   assert.ok(!fs.existsSync(legacy));
+
+  // a legacy-looking name without artifact structure is not ours
+  const lookalike = path.join(parent, '.dsh-rehearsal');
+  const fakeChild = path.join(lookalike, 'check-important');
+  fs.mkdirSync(fakeChild, { recursive: true });
+  fs.writeFileSync(path.join(fakeChild, 'secret.txt'), 'unrelated user data');
+  const refused2 = runCli(['clean', '--artifacts', lookalike, '--yes']);
+  assert.equal(refused2.status, 3, 'naming alone must not authorise a recursive delete');
+  assert.match(refused2.stderr, /ownership marker/);
+  assert.ok(fs.existsSync(path.join(fakeChild, 'secret.txt')));
 
   // a mixed parent (one owned child, one loose file) is not owned
   const mixed = path.join(parent, 'mixed');

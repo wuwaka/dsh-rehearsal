@@ -14,7 +14,7 @@ import { stageTimer, validateVersionOption, claimOwnedDir } from '../lib/util.js
 export async function cmdCheck(opts) {
   // Version-valued options are validated at the boundary: an unvalidated
   // `--candidate nonsense` does not fail, it silently skips every peer
-  // comparison and reports a clean-looking verdict (measured 2026-10-05).
+  // comparison and reports a clean-looking verdict.
   validateVersionOption(opts.candidate, '--candidate');
   validateVersionOption(opts.current, '--current');
   // Home resolution: --home > DSH_HOME > a validated default home > a

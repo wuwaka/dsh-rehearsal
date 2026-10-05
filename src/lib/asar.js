@@ -1,6 +1,6 @@
 // Read-only ASAR archive access for desktop runtime probing.
 //
-// Format (validated against a real official package on 2026-10-05: the
+// Format (validated against a real official package — the
 // 0.2.0-rc.2 win-x64 install, 121,348,951 B archive with a 3,392,064 B
 // header): an 8-byte size pickle (uint32 = 4, then uint32 = header pickle
 // bytes), the header pickle (uint32 payload size, uint32 string length,
@@ -15,7 +15,7 @@
 // are misses too — no cross-container stitching; paths are `/`-separated and
 // empty, `.`, and `..` segments are rejected (mirrors the upstream
 // runtimePath discipline). The header size is capped at ~19x the measured
-// official 0.2.0-rc.2 header (3,392,064 B on 2026-10-05) so upstream growth
+// official 0.2.0-rc.2 header (3,392,064 B) so upstream growth
 // is tolerated but unbounded reads are not.
 
 import fs from 'node:fs';

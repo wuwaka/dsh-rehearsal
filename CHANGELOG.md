@@ -11,6 +11,17 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+### Fixed
+
+- The npm install of the candidate now runs under a credential-stripped environment: with `--run-scripts`, dependency lifecycle scripts used to inherit the full parent environment, so the escape hatch that grants script execution also re-exposed host secrets. It now strips every credential-shaped variable, same rule as the candidate's own runs.
+- CLI flags parse under one contract (`src/lib/args.js`): every `--dashed-flag` is stored under both its dashed and camelCase spelling — `--shadow-dir`, `--prefix-dir` and `--skip-write` from the command line used to be silently ignored because the parser stored one spelling while the command code read the other. Switches (`--run-scripts`, `--allow-tools`, `--keep`, `--skip-write`, `--yes`, `--full`) accept `=true`/`=false` explicitly, reject any other value, and never consume the next argument — `--yes=false` no longer reads as "confirmed".
+- `clean`'s pre-marker fallback now checks structure, not only naming: a `.dsh-rehearsal` layout is cleanable only when each generated child carries its report (`report.json`/`report.md`) or is an interrupted run's empty directory.
+
+### Changed
+
+- README relative links that pointed at maintainer documents outside the npm tarball (PUBLISHING, AUDIT) are absolute GitHub URLs, so the shipped README has no dead relative links.
+- The last review/date residue in production comments is gone; comments state why a rule holds, the audit trail stays in AUDIT.md and this changelog. Regression locks: test count 125 → 129.
+
 ## [0.3.12] - 2026-10-05
 
 ### Fixed

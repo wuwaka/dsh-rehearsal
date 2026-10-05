@@ -1,7 +1,7 @@
 // Session drill mechanics: lazy-migration trigger, read-side integrity over
 // the post-migration generation, and the keyless write round.
 //
-// Verdict discipline (reviews, 2026-10-02): the keyless migration exits 1
+// Verdict discipline: the keyless migration exits 1
 // with MISSING_CREDENTIAL while succeeding — verdicts are driven by
 // artifacts (files appearing, decodability, seq continuity, new durable
 // rows), never by process exit codes.
@@ -134,7 +134,7 @@ export function extractRoutes(fixtureText) {
  * Tool names a session's own history would replay during a write round.
  * The replay script is DERIVED from the recorded assistant streams, and a
  * settled call can appear in FOUR row shapes (ground truth from a full
- * library census, 2026-10-02): `tool/call`, packed `tool-call-chunks`, and
+ * library census): `tool/call`, packed `tool-call-chunks`, and
  * PTC/code-mode dispatch rows (`tool/ptc-dispatch`, `tool/code-dispatch[-
  * start]`) — run_code sessions often carry ONLY dispatch rows. A tool/*
  * row (except tool/result) with no parseable name is recorded as

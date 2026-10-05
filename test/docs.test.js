@@ -113,9 +113,9 @@ const CITE_RE = /([\w./-]+\.(?:js|mjs|ts|yml|yaml|json|md)):(\d+)(?:-(\d+))?/g;
 // whole review round.)
 const CITED_LINES = [
   ['src/lib/report.js', 225, /export function finalize\(report\)/],
-  ['src/lib/util.js', 71, /credential-shaped variable/],
-  ['src/lib/util.js', 90, /DSH_TELEMETRY_MODE = 'DISABLED'/],
-  ['src/lib/shadow.js', 138, /TOOL_ROW_NAME_PREFIXES = \[/],
+  ['src/lib/util.js', 69, /credential-shaped variable/],
+  ['src/lib/util.js', 103, /DSH_TELEMETRY_MODE = 'DISABLED'/],
+  ['src/lib/shadow.js', 141, /TOOL_ROW_NAME_PREFIXES = \[/],
   ['src/lib/drill.js', 14, /WRITE_FAIL_SIGNATURES = \[/],
   ['src/lib/drill.js', 22, /preset-not-composed/],
   ['src/lib/drill.js', 28, /cwd-mismatch/],

@@ -1,16 +1,17 @@
 // Shadow-home lifecycle: candidate dsh installation into a private prefix,
 // llm-replay mount, and environment rules. Safety rules encoded here:
 //  - the ONLY dsh binary ever invoked is the one we npm-installed ourselves
-//    (the desktop shim on PATH ignores DSH_HOME and pollutes the real home —
-//    verified by review, 2026-10-02)
+//    (the desktop shim on PATH ignores DSH_HOME and pollutes the real home)
 //  - telemetry explicitly DISABLED (candidate 0.2.0 defaults FEEDBACK_ONLY
 //    and OTLP bypasses proxies)
-//  - keyless by design: DEEPSEEK_API_KEY removed from the child environment
+//  - keyless by design: credential-shaped variables are stripped from every
+//    child environment, including the npm install that runs the dependency
+//    lifecycle scripts under --run-scripts
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { run, shadowEnv, ASSUMED_CONTEXT_WINDOW_TOKENS } from './util.js';
+import { run, shadowEnv, sanitizedEnv, ASSUMED_CONTEXT_WINDOW_TOKENS } from './util.js';
 
 /**
  * Find npm's npm-cli.js: first beside the running node, then derived from
@@ -48,9 +49,9 @@ export function locateNpmCli() {
 }
 
 /**
- * Install an exact @deepseek-ai/dsh version into a private prefix.
- * Reviews measured ~500 packages / 2-5 min per version; npm cache shortens
- * repeats. Returns the bin entry path (lib/bin.js) to invoke via node.
+ * Install an exact @deepseek-ai/dsh version into a private prefix (~500
+ * transitive packages; minutes per version, npm cache shortens repeats).
+ * Returns the bin entry path (lib/bin.js) to invoke via node.
  */
 export async function installCandidate(version, prefixDir, log = () => {}, { runScripts = false } = {}) {
   const pkgDir = path.join(prefixDir, 'node_modules', '@deepseek-ai', 'dsh');
@@ -73,16 +74,18 @@ export async function installCandidate(version, prefixDir, log = () => {}, { run
   //    runtime (RStudio etc.) that ships no npm at all.
   // So: find npm.cmd via `where`, derive its bundled npm-cli.js, and run it
   // with plain node. No shell, no quoting hazards.
-  // Lifecycle scripts of ~500 transitive packages are denied by default
+  // Lifecycle scripts of ~500 transitive packages are denied by default:
   // the official pnpm profile allowlists only esbuild/lefthook/
   // node-pty/koffi etc., so a blanket npm run is a wider execution surface
   // than the user's own profile permits. Escape hatch: runScripts=true
-  // (--run-scripts) when a native dep genuinely needs its build step.
+  // (--run-scripts) when a native dep genuinely needs its build step — and
+  // even then the scripts run under sanitizedEnv(): the escape hatch grants
+  // script execution, not access to the host's credentials.
   const installArgs = ['install', '--prefix', prefixDir, `@deepseek-ai/dsh@${version}`, '--no-audit', '--no-fund', '--loglevel=error'];
   if (!runScripts) installArgs.push('--ignore-scripts');
   const npmCli = locateNpmCli();
   if (!npmCli) throw new Error('npm not located (searched beside the running node and via `where npm`) — install Node.js/npm and retry');
-  const r = run(process.execPath, [npmCli, ...installArgs], { timeoutMs: 600000 });
+  const r = run(process.execPath, [npmCli, ...installArgs], { env: sanitizedEnv(), timeoutMs: 600000 });
   if (r.code !== 0 || !fs.existsSync(pj)) {
     throw new Error(`candidate install failed (exit ${r.code}${r.error ? `, ${r.error}` : ''}): ${r.stderr.split('\n').filter(Boolean).slice(-3).join(' | ') || r.error || 'no output'}`);
   }

@@ -53,7 +53,7 @@ npm install -g dsh-rehearsal                        # npm registry
 npm install -g github:wuwaka/dsh-rehearsal#v0.3.12   # 或固定到 GitHub tag
 ```
 
-两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
+两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（校验步骤见 [PUBLISHING.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.md)）。
 
 ## 快速开始
 
@@ -164,7 +164,7 @@ Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代
 
 - [docs/architecture.md](docs/architecture.md) —— 为什么是外部 CLI、模块划分、与同类工具的分工
 - [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md) —— 每条日志形态能证明什么、不能证明什么
-- [SECURITY.md](SECURITY.md) · [AUDIT.md](AUDIT.md) · [CHANGELOG.zh.md](CHANGELOG.zh.md) · [PUBLISHING.md](PUBLISHING.md)
+- [SECURITY.md](SECURITY.md) · [AUDIT.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/AUDIT.md) · [CHANGELOG.zh.md](CHANGELOG.zh.md) · [PUBLISHING.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.md)
 
 ## 开发
 
@@ -173,6 +173,6 @@ npm install && npm test
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 
-CI 跑 `npm ci` + `npm test`，矩阵 windows / macOS / linux × Node 22.19 / 24.x。CI 不跑 `run`：它会安装约 500 个包并重放会话副本，在共享 runner 上既不确定也不合适。发布流程见 [PUBLISHING.md](PUBLISHING.md)。
+CI 跑 `npm ci` + `npm test`，矩阵 windows / macOS / linux × Node 22.19 / 24.x。CI 不跑 `run`：它会安装约 500 个包并重放会话副本，在共享 runner 上既不确定也不合适。发布流程见 [PUBLISHING.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.md)。
 
 MIT License。与 DeepSeek 无关联、未获其背书。上游 [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)（官方桌面在其 `apps/desktop`）；社区桌面宿主与活跃缺陷跟踪 [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop)。

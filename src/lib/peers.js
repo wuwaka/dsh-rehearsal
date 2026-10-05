@@ -2,7 +2,7 @@
 // process spawns, works even while DSH Desktop is running and even for the
 // desktop profile that the npm CLI refuses to manage.
 //
-// Risk shapes found on a real machine (reviews, 2026-10-02):
+// Risk shapes found on a real machine:
 //  - plugin -> dsh peer pins that exclude the candidate (prerelease caret
 //    does not cross minors: ^0.1.7-rc.2 excludes 0.2.0 entirely, which forces
 //    authors into fragile version enumeration lists)
@@ -207,11 +207,11 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
  * satisfies() excludes prereleases unless the range opts in via
  * [range, options]. We want standard npm semantics (a caret range over a
  * prerelease base does not match a higher-minor prerelease) — that is
- * exactly the footgun the reviews documented, so use the default strict
+ * exactly the footgun this module guards against, so use the default strict
  * behavior: allow prerelease matches only when the range itself mentions a
  * prerelease of the same [major, minor, patch] tuple.
  *
- * Unparseable ranges: measured 2026-10-05, semver.satisfies() RETURNS FALSE
+ * Unparseable ranges: semver.satisfies() RETURNS FALSE
  * for garbage ranges ('>=0.2.0 ???'), it does not throw. The catch is
  * belt-and-braces for a future semver changing that, and it returns FALSE —
  * "cannot prove it satisfies" must never masquerade as compatible. The

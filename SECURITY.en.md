@@ -14,13 +14,13 @@ The properties below are enforced in code and covered by tests. A report that an
 | Deletion and writes carry an ownership boundary: `clean` only removes artifact directories bearing this tool's marker (the home, the working directory and filesystem roots are refused outright); `--shadow-dir` / `--prefix-dir` are refused when non-empty and unmarked | `src/lib/util.js`, `src/cli.js` |
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:71-90` |
-| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:90` |
+| No credential-shaped environment variable reaches any child process (the candidate's own runs and the candidate install's npm lifecycle scripts alike); only the stripped variable names are recorded | `src/lib/util.js:69-103` |
+| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:103` |
 | Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings; a scrub that fails the invariant makes `writeReport()` refuse to write | `src/lib/report.js:225`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
 | The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
 
-The failure direction of the tool-suppression list (`src/lib/shadow.js:138`) is one-sided: if a new tool family escapes the list, its row stays enabled, but this opens no execution path — the write round only replays tool calls that appear in the session's own recording, and sessions whose history carries unknown or write-class tools are skipped wholesale at the pre-screen (fail-closed). A stale list leaves suppression incomplete; it never lets an unexpected tool execute. `--allow-tools` (off by default) remains the outermost explicit gate.
+The failure direction of the tool-suppression list (`src/lib/shadow.js:141`) is one-sided: if a new tool family escapes the list, its row stays enabled, but this opens no execution path — the write round only replays tool calls that appear in the session's own recording, and sessions whose history carries unknown or write-class tools are skipped wholesale at the pre-screen (fail-closed). A stale list leaves suppression incomplete; it never lets an unexpected tool execute. `--allow-tools` (off by default) remains the outermost explicit gate.
 
 ## Explicitly dangerous options
 
@@ -30,7 +30,7 @@ The failure direction of the tool-suppression list (`src/lib/shadow.js:138`) is 
 |---|---|
 | `--allow-tools` | Executes the tool calls recorded in session history. The sandboxed `cwd` still applies, but `pwsh`, `bash` or any absolute path can leave that directory. A banner is printed before execution |
 | `--keep` | Leaves plaintext session copies in the shadow home and the install prefix. Do not use it on an unmanaged machine; remove the output afterwards with `dsh-rehearsal clean --yes` (`--shadow-dir` and `--prefix-dir` are never auto-cleaned either, and `clean` does not touch them — it only removes the default artifacts directory) |
-| `--run-scripts` | Lets the candidate install run third-party lifecycle scripts. The default is `--ignore-scripts`, matching the short build-script list the official pnpm setup whitelists |
+| `--run-scripts` | Lets the candidate install run third-party lifecycle scripts. The default is `--ignore-scripts`, matching the short build-script list the official pnpm setup whitelists; even when enabled, the scripts run under a credential-stripped environment |
 
 ## Reports are sensitive data
 

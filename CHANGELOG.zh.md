@@ -9,6 +9,17 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 候选安装的 npm 过程改在剥除凭据的环境下运行：开启 `--run-scripts` 时，依赖生命周期脚本此前继承完整宿主环境——授予脚本执行的逃生门顺带重新暴露了宿主凭据。现在与候选运行同规则剥离全部凭据形状变量。
+- CLI 旗标统一到一份契约（`src/lib/args.js`）：每个 `--dashed-flag` 同时以连字符与 camelCase 两种拼写存储——`--shadow-dir`、`--prefix-dir` 与 `--skip-write` 从命令行传入时此前被静默忽略（解析器存一种拼写、命令代码读另一种）。开关类旗标（`--run-scripts`、`--allow-tools`、`--keep`、`--skip-write`、`--yes`、`--full`）显式接受 `=true`/`=false`，其余取值直接报错，且不再吞掉下一个参数——`--yes=false` 不再被读作"已确认"。
+- `clean` 的无标记兼容路径改为结构判定：`.dsh-rehearsal` 布局只有在每个生成子目录携带自己的报告（`report.json`/`report.md`）或被中断运行为空目录时才可清理。
+
+### 变更
+
+- README 中指向 npm 包外维护者文档（PUBLISHING、AUDIT）的相对链接改为 GitHub 绝对地址，随包 README 不再有失效相对链接。
+- 生产代码注释的最后一批评审/日期残留清除：注释只陈述"为什么必须如此"，审计轨迹留在 AUDIT.md 与本文件。回归锁：测试数 125 → 129。
+
 ## [0.3.12] - 2026-10-05
 
 ### 修复

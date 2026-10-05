@@ -1,6 +1,6 @@
 // Session-library discovery, sampling and the shadow copy set.
 //
-// Constraints learned from reviews + hands-on verification (2026-10-02):
+// Constraints learned from hands-on verification:
 //  - headers live in the FIRST frame of the oldest generation file
 //  - sessions whose header carries agentPreset are refused by the one-shot
 //    runner ("runs under agent preset X, which the one-shot runner does not

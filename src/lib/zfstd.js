@@ -3,7 +3,7 @@
 // Why this exists: dsh session logs (session.vN.jsonl[.zstd]) are MULTI-FRAME
 // zstd files — one frame per write batch. Node's zlib zstdDecompressSync /
 // createZstdDecompress silently decode ONLY the first frame and do not error
-// (verified 2026-10-02: a 3,776,880-byte v4 log decoded to 233 bytes / 1 line
+// (a 3,776,880-byte v4 log decoded to 233 bytes / 1 line
 // via zlib, while manual frame splitting yields 1,395 frames / 3,005 lines).
 // Any tool that reads session logs with plain zlib will silently see "one
 // line" — this module is the guard against that failure mode.

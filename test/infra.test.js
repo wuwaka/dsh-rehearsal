@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { countRows, simpleListAfter } from '../src/lib/yaml-lite.js';
 import { listProfiles, detectCurrentDshVersion, runtimeEvidence } from '../src/lib/dshhome.js';
-import { shadowEnv, redactedEnvNames, claimOwnedDir, readOwner, isOwnedArtifactsDir } from '../src/lib/util.js';
+import { shadowEnv, redactedEnvNames, claimOwnedDir, readOwner, isOwnedArtifactsDir, sanitizedEnv, run } from '../src/lib/util.js';
 import { patchAdoptionGate } from '../src/lib/shadow.js';
 
 const DESKTOP_LIKE = `- id: desktop-shell
@@ -102,6 +102,29 @@ test('detectCurrentDshVersion prefers the profile-scoped install over machine pr
   assert.equal(detectCurrentDshVersion(home, undefined), detectCurrentDshVersion(home, null), 'missing profile name must not throw');
 });
 
+test('sanitizedEnv keeps the install path credential-stripped (round 7)', (t) => {
+  // with --run-scripts the dependency lifecycle scripts execute; before this
+  // fix they inherited the full parent environment, secret-shaped vars and all
+  process.env.R7_SECRET_PROBE_TOKEN = 'super-secret-value';
+  process.env.R7_PLAIN_VAR = 'ok';
+  try {
+    const env = sanitizedEnv();
+    assert.equal(env.R7_SECRET_PROBE_TOKEN, undefined, 'secret stripped');
+    assert.equal(env.R7_PLAIN_VAR, 'ok', 'plain vars preserved');
+    assert.equal(env.DSH_HOME, undefined, 'the install env is not a shadow env');
+    const r = run(process.execPath, ['-e', 'console.log(process.env.R7_SECRET_PROBE_TOKEN ?? "absent")'], { env: sanitizedEnv() });
+    assert.equal(r.stdout.trim(), 'absent', 'a child actually cannot see the secret');
+    assert.equal(process.env.R7_SECRET_PROBE_TOKEN, 'super-secret-value', 'parent untouched');
+  } finally {
+    delete process.env.R7_SECRET_PROBE_TOKEN;
+    delete process.env.R7_PLAIN_VAR;
+  }
+  // wiring lock: the candidate install must pass this env to its npm spawn
+  const src = fs.readFileSync(path.join(import.meta.dirname, '..', 'src', 'lib', 'shadow.js'), 'utf8');
+  const block = src.slice(src.indexOf('export async function installCandidate'), src.indexOf('export function mountReplayPlugin'));
+  assert.match(block, /env:\s*sanitizedEnv\(\)/, 'npm install must run credential-stripped');
+});
+
 test('claimOwnedDir adopts empty dirs, reuses its own marker, refuses foreign content (round 6)', (t) => {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dshr-own-'));
   t.after(() => fs.rmSync(base, { recursive: true, force: true }));
@@ -148,8 +171,17 @@ test('isOwnedArtifactsDir: markers, aggregate parents, legacy layout, refusals (
 
   const legacy = path.join(base, '.dsh-rehearsal');
   fs.mkdirSync(path.join(legacy, 'run-0.2.0-rc.2-1790945328460'), { recursive: true });
+  fs.writeFileSync(path.join(legacy, 'run-0.2.0-rc.2-1790945328460', 'report.json'), '{}');
   fs.mkdirSync(path.join(legacy, 'check-1791188357615'), { recursive: true });
-  assert.equal(isOwnedArtifactsDir(legacy), true, 'pre-marker default layout stays cleanable (real check-/run- naming)');
+  fs.mkdirSync(path.join(legacy, 'check-interrupted'), { recursive: true }); // empty child: interrupted run
+  assert.equal(isOwnedArtifactsDir(legacy), true, 'pre-marker default layout stays cleanable (report or empty children)');
+
+  const fakeParent = path.join(base, 'elsewhere');
+  fs.mkdirSync(fakeParent, { recursive: true });
+  const fake = path.join(fakeParent, '.dsh-rehearsal');
+  fs.mkdirSync(path.join(fake, 'check-important'), { recursive: true });
+  fs.writeFileSync(path.join(fake, 'check-important', 'secret.txt'), 'x');
+  assert.equal(isOwnedArtifactsDir(fake), false, 'a name without artifact structure is not ours');
 
   const wrongName = path.join(base, 'elsewhere');
   fs.mkdirSync(path.join(wrongName, 'check-9'), { recursive: true });

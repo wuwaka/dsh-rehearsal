@@ -64,15 +64,16 @@ export function run(cmd, args, { cwd, env, timeoutMs = 180000, shell = false, re
 }
 
 /**
- * Environment for every candidate-dsh invocation inside a shadow home.
+ * Keyed environments for child processes. Both return the COMPLETE child
+ * environment (callers must not merge process.env back in): the parent
+ * process is never mutated, and every credential-shaped variable (API_KEY /
+ * TOKEN / SECRET / CREDENTIAL / PASSWORD / PRIVATE_KEY / AUTH) is stripped
+ * rather than only DEEPSEEK_API_KEY. Reports record the REDACTED NAMES via
+ * redactedEnvNames(), never values.
  *
- * Returns the COMPLETE child environment (caller must not merge with
- * process.env): the parent process is never mutated, and every
- * credential-shaped variable (API_KEY / TOKEN / SECRET / CREDENTIAL /
- * PASSWORD / PRIVATE_KEY / AUTH) is stripped rather than only
- * DEEPSEEK_API_KEY. Telemetry is explicitly disabled (candidate 0.2.0
- * defaults FEEDBACK_ONLY and OTLP bypasses proxies); reports record the
- * REDACTED NAMES via redactedEnvNames(), never values.
+ * shadowEnv() additionally points DSH_HOME at a shadow home and disables
+ * telemetry explicitly (candidate 0.2.0 defaults FEEDBACK_ONLY and OTLP
+ * bypasses proxies).
  */
 const SECRET_KEY = /API[_-]?KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|AUTH/i;
 
@@ -80,12 +81,24 @@ export function redactedEnvNames(env = process.env) {
   return Object.keys(env).filter((k) => SECRET_KEY.test(k)).sort();
 }
 
-export function shadowEnv(shadowHome) {
+/**
+ * A credential-stripped copy of the parent environment. Used wherever a
+ * child runs host code that is not the candidate itself — notably the
+ * `npm install` of the candidate: with `--run-scripts` the dependency
+ * lifecycle scripts execute, and that escape hatch must not re-expose the
+ * host's credential-shaped variables.
+ */
+export function sanitizedEnv() {
   const env = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (SECRET_KEY.test(k)) continue;
     env[k] = v;
   }
+  return env;
+}
+
+export function shadowEnv(shadowHome) {
+  const env = sanitizedEnv();
   env.DSH_HOME = shadowHome;
   env.DSH_TELEMETRY_MODE = 'DISABLED';
   return env;
@@ -114,8 +127,8 @@ export const VERDICT = {
  * Absent (undefined/null) is allowed; the caller decides requiredness.
  * Everything else must be an exact semver string, because an unvalidated
  * version does not fail — it silently turns the peer comparison into "not
- * executed" and yields a clean-looking verdict (measured 2026-10-05: a
- * `check --candidate nonsense` run exited 0 with `upgrade-ok`).
+ * executed" and yields a clean-looking verdict (a `check --candidate
+ * nonsense` run exits 0 with `upgrade-ok`).
  */
 export function validateVersionOption(value, flag) {
   if (value === undefined || value === null) return null;
@@ -177,8 +190,10 @@ export function claimOwnedDir(dir, kind) {
  * True when `clean` may delete dir: it carries the artifact marker itself,
  * every immediate child directory carries it (the default .dsh-rehearsal
  * parent), or it is the tool's own default layout from before markers
- * existed — name `.dsh-rehearsal` with only its own generated children
- * (`check-<ts>`, `run-<version>-<ts>`).
+ * existed — name `.dsh-rehearsal`, children matching the generated names
+ * (`check-<ts>`, `run-<version>-<ts>`), and each child carrying an artifact
+ * (report.json / report.md) or being an interrupted run's empty directory.
+ * A name that merely looks ours must not authorise a recursive delete.
  */
 export function isOwnedArtifactsDir(dir) {
   if (readOwner(dir) === OWNER_KINDS.artifact) return true;
@@ -187,8 +202,13 @@ export function isOwnedArtifactsDir(dir) {
   if (!entries.length) return false;
   const marked = (p) => readOwner(p) === OWNER_KINDS.artifact;
   if (entries.every((e) => e.isDirectory() && marked(path.join(dir, e.name)))) return true;
-  return path.basename(path.resolve(dir)) === '.dsh-rehearsal'
-    && entries.every((e) => e.isDirectory() && /^(check|run)-[\w.-]+$/.test(e.name));
+  if (path.basename(path.resolve(dir)) !== '.dsh-rehearsal') return false;
+  return entries.every((e) => {
+    if (!e.isDirectory() || !/^(check|run)-[\w.-]+$/.test(e.name)) return false;
+    let kids = [];
+    try { kids = fs.readdirSync(path.join(dir, e.name)); } catch { return false; }
+    return kids.length === 0 || kids.includes('report.json') || kids.includes('report.md');
+  });
 }
 
 /** Refuse targets where a recursive delete could take down the machine's state. */

@@ -125,8 +125,8 @@ export function scrubText(s) {
   // Home rules consume to the END OF THE FIELD exactly like the general
   // rules below. The old whitespace-bounded match orphaned the tail once the
   // prefix became `~` (`C:\Users\John Smith\.dsh` -> `~ Smith\.dsh`;
-  // `C:\Users\Jane\AppData\Local\Temp\x` -> `~\AppData\Local\Temp\x` — both
-  // measured 2026-10-05) and the invariant cannot catch an orphaned tail
+  // `C:\Users\Jane\AppData\Local\Temp\x` -> `~\AppData\Local\Temp\x`) and
+  // the invariant cannot catch an orphaned tail
   // that no longer looks absolute. An unambiguous home path still normalises
   // to `~`; a field containing spaces is ambiguous, so it escalates to
   // `<abs-path>` rather than risk keeping a fragment.
@@ -252,17 +252,14 @@ export function finalize(report) {
  * The only sanctioned way to put a report on disk.
  *
  * finalize() runs on EVERY write, unconditionally: `privacy.scrubbed` is the
- * RESULT of the last scrub, not a permission token. Trusting it to skip work
- * left a real gap — a report finalized once, then mutated by a later stage,
- * reached disk with the mutation unscrubbed and the flag still claiming
- * `true` (measured 2026-10-05: a path injected after finalize shipped
- * verbatim).
+ * RESULT of the last scrub, not a permission token — a report finalized
+ * once and then mutated by a later stage must not reach disk with the
+ * mutation unscrubbed while the flag still claims `true`.
  *
- * Fail-closed: when the invariant still finds
- * path-shaped text after scrubbing, the report is NOT written at all. The
- * earlier behaviour warned and wrote anyway, which contradicted the promise
- * that reports are sanitised before they reach disk — a warning next to
- * leaked data is not a gate.
+ * Fail-closed: when the invariant still finds path-shaped text after
+ * scrubbing, the report is NOT written at all. A warning next to leaked
+ * data is not a gate, and the promise is that reports are sanitised before
+ * they reach disk.
  */
 export function writeReport(dir, report) {
   const done = finalize(report);

@@ -53,7 +53,7 @@ npm install -g dsh-rehearsal                        # npm registry
 npm install -g github:wuwaka/dsh-rehearsal#v0.3.12   # or pin to a GitHub tag
 ```
 
-Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
+Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (verification steps in [PUBLISHING.en.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.en.md)).
 
 ## Quick start
 
@@ -164,7 +164,7 @@ Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session 
 
 - [docs/architecture.en.md](docs/architecture.en.md) — why an external CLI, module layout, and how this divides labour from comparable tools
 - [docs/FAILURE_MODES.en.md](docs/FAILURE_MODES.en.md) — what each log pattern proves, and what it does not
-- [SECURITY.en.md](SECURITY.en.md) · [AUDIT.en.md](AUDIT.en.md) · [CHANGELOG.md](CHANGELOG.md) · [PUBLISHING.en.md](PUBLISHING.en.md)
+- [SECURITY.en.md](SECURITY.en.md) · [AUDIT.en.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/AUDIT.en.md) · [CHANGELOG.md](CHANGELOG.md) · [PUBLISHING.en.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.en.md)
 
 ## Development
 
@@ -173,6 +173,6 @@ npm install && npm test
 node src/cli.js check --candidate 0.2.0-rc.2
 ```
 
-CI runs `npm ci` + `npm test` across windows / macOS / linux × Node 22.19 / 24.x. CI does not run `run`: that command installs roughly 500 packages and replays session copies, which is neither deterministic nor appropriate on a shared runner. Release procedure: [PUBLISHING.en.md](PUBLISHING.en.md).
+CI runs `npm ci` + `npm test` across windows / macOS / linux × Node 22.19 / 24.x. CI does not run `run`: that command installs roughly 500 packages and replays session copies, which is neither deterministic nor appropriate on a shared runner. Release procedure: [PUBLISHING.en.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.en.md).
 
 MIT License. Not affiliated with or endorsed by DeepSeek. Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness) (the official desktop lives in its `apps/desktop`); community desktop host and active issue tracker: [`anywhere-labs/dsh-desktop`](https://github.com/anywhere-labs/dsh-desktop).

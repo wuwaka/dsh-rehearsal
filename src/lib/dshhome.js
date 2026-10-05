@@ -335,7 +335,7 @@ function profileMarkerUntrusted() {
 
 /**
  * Heuristic for "which profile is the live one" — never assume `web`.
- * Reviews (2026-10-02) measured desktop=11 bundles/198 patch lines vs web=4/4;
+ * Measured on one machine: desktop=11 bundles/198 patch lines vs web=4/4;
  * ranking by bundles, then patch lines, then newest mtime picked the real one.
  */
 export function inspectProfile(home, name) {
@@ -359,15 +359,15 @@ export function inspectProfile(home, name) {
   }
 
   // Patch layers: profile-level cordis.patch.yml, plus the home-level layer
-  // that the reviews found missing from naive inventories.
+  // that a naive inventory misses.
   const profilePatch = path.join(dir, 'cordis.patch.yml');
   if (fs.existsSync(profilePatch)) out.patchLayers.profile = countRows(fs.readFileSync(profilePatch, 'utf8'));
   const homePatch = path.join(home, 'cordis.patch.yml');
   if (fs.existsSync(homePatch)) out.patchLayers.home = countRows(fs.readFileSync(homePatch, 'utf8'));
 
   // Exact installed versions come from the profile's own node_modules (or the
-  // pnpm lock as a fallback). link:/file:/github: deps are flagged: reviews
-  // found 3/7 desktop deps are not reproducible in a shadow.
+  // pnpm lock as a fallback). link:/file:/github: deps are flagged: 3/7
+  // desktop deps are not reproducible in a shadow.
   const nm = path.join(dir, 'node_modules');
   for (const dep of Object.keys(out.manifest?.dependencies ?? {})) {
     const entry = { name: dep, version: null, source: out.manifest.dependencies[dep], reproducible: true };
@@ -424,7 +424,7 @@ export function pickLiveProfile(profiles) {
 export function readSettingsShape(home) {
   const settingsYaml = path.join(home, 'settings.yaml');
   const imported = path.join(home, 'settings.yaml.imported');
-  // Reviews: some machines have no active settings.yaml, only settings.yaml.imported.
+  // Some machines have no active settings.yaml, only settings.yaml.imported.
   if (fs.existsSync(settingsYaml)) return { kind: 'settings.yaml', path: settingsYaml };
   if (fs.existsSync(imported)) return { kind: 'settings.yaml.imported', path: imported };
   return { kind: 'none', path: null };
