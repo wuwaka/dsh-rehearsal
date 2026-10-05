@@ -5,15 +5,24 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultHome, listProfiles, inspectProfile, pickLiveProfile, readSettingsShape, readMarketFacts, detectCurrentDshVersion } from '../lib/dshhome.js';
+import { resolveHome, runtimeEvidence, defaultHome, listProfiles, inspectProfile, pickLiveProfile, readSettingsShape, readMarketFacts } from '../lib/dshhome.js';
 import { discoverSessions } from '../lib/sessions.js';
 import { analyzePeerGraph } from '../lib/peers.js';
 import { newReport, addStage, finalize, toMarkdown, homeShape, writeReport } from '../lib/report.js';
 import { stageTimer } from '../lib/util.js';
 
 export async function cmdCheck(opts) {
-  const home = opts.home ?? defaultHome();
+  // Home resolution: --home > DSH_HOME > a validated default home > a
+  // validated host-catalog home (check is read-only, so a discovered desktop
+  // home is used directly, labelled, with alternates surfaced when several
+  // validate). Origin rides in the report as a label, never a path.
+  const resolved = resolveHome(opts.home);
+  const home = resolved.home;
   const report = newReport({ candidateVersion: opts.candidate ?? null, profile: null, command: 'check' });
+  report.target.homeOrigin = resolved.origin;
+  if (resolved.alternates.length) {
+    report.warnings.push(`multiple valid homes detected (selected ${resolved.origin}; also valid: ${resolved.alternates.join(', ')}) — pass --home to disambiguate`);
+  }
   const artifactsDir = path.resolve(opts.artifacts ?? path.join(process.cwd(), '.dsh-rehearsal', `check-${Date.now()}`));
   fs.mkdirSync(artifactsDir, { recursive: true });
 
@@ -37,7 +46,7 @@ export async function cmdCheck(opts) {
     blocking: true,
     durationMs: ms(),
     details: live
-      ? `home=${homeShape(home, defaultHome())}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
+      ? `home=${homeShape(home, defaultHome(), resolved.origin)}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
       : `no usable profile found under the given DSH_HOME (home=${homeShape(home, defaultHome())})`,
     evidence: live
       ? [
@@ -53,10 +62,13 @@ export async function cmdCheck(opts) {
     return { report, code: 3 };
   }
 
-  // ---- B1: peer graph. current auto-detected ONCE, reused by the analysis
-  // and the details line (round-3 nit: was probed twice).
+  // ---- B1: peer graph. current auto-detected ONCE with provenance, reused
+  // by the analysis and the details line (round-3 nit: was probed twice).
   ms = stageTimer();
-  const current = opts.current ?? detectCurrentDshVersion(home, live.name);
+  const evidence0 = opts.current
+    ? { version: opts.current, sources: [{ host: '--current', version: opts.current, source: '--current' }], ambiguous: null }
+    : runtimeEvidence(home, live.name, resolved.origin);
+  const current = evidence0.version;
   const pluginDetails = [];
   const nm = path.join(live.dir, 'node_modules');
   for (const p of live.plugins) {
@@ -85,8 +97,10 @@ export async function cmdCheck(opts) {
     verdict: noCandidate ? 'warn' : blockingFindings.length ? 'fail' : findings.length ? 'warn' : 'pass',
     blocking: true,
     durationMs: ms(),
-    details: `${noCandidate ? 'no --candidate given, newly-broken comparison NOT exercised; ' : ''}${pluginDetails.length} plugins analyzed against candidate=${opts.candidate ?? 'n/a'} current=${current ?? 'n/a'}; ${findings.length} findings (${blockingFindings.length} newly-broken high, ${preExisting.length} pre-existing)`,
-    evidence: findings,
+    details: `${noCandidate ? 'no --candidate given, newly-broken comparison NOT exercised; ' : ''}${pluginDetails.length} plugins analyzed against candidate=${opts.candidate ?? 'n/a'} current=${current ?? 'n/a'}; ${findings.length} findings (${blockingFindings.length} newly-broken high, ${preExisting.length} pre-existing)${current ? '' : '; current unknown: excluded-candidate plugins are classified high (re-run with --current)'}`,
+    evidence: evidence0.sources.length
+      ? [...findings, { currentRuntime: { version: evidence0.version, sources: evidence0.sources, ambiguous: evidence0.ambiguous ?? undefined } }]
+      : findings,
   });
   if (noCandidate) {
     report.warnings.push('no --candidate: the "0 newly-broken high" figure is an unrun comparison, not a clean result. Re-run with --candidate <version> to answer the upgrade question.');

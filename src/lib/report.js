@@ -21,7 +21,10 @@ const pkgVersion = JSON.parse(
  * cwd-relative ".dsh" while defaultHome() used os.homedir()), which would have
  * labelled the real default as "custom".
  */
-export function homeShape(home, def) {
+export function homeShape(home, def, origin) {
+  // Desktop-discovered homes carry a catalog-slug origin (`desktop:<id>` —
+  // static ids, no user input, no separators); the shape IS the origin.
+  if (typeof origin === 'string' && origin.startsWith('desktop:')) return origin;
   if (typeof home !== 'string' || !home) return 'unknown';
   if (typeof def !== 'string' || !def) return 'custom';
   const norm = (p) => path.resolve(p).replace(/[\\/]+$/, '');

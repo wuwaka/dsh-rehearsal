@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { defaultHome, listProfiles, inspectProfile, pickLiveProfile, detectCurrentDshVersion } from '../lib/dshhome.js';
+import { resolveHome, runtimeEvidence, listProfiles, inspectProfile, pickLiveProfile } from '../lib/dshhome.js';
 import { discoverSessions, classify, copySet } from '../lib/sessions.js';
 import { analyzePeerGraph } from '../lib/peers.js';
 import { installCandidate, mountReplayPlugin, headlessRun, writeReplayPatch, patchAdoptionGate } from '../lib/shadow.js';
@@ -27,12 +27,80 @@ function bootFindings(stderr) {
   return [...BOOT_SIGNATURES.filter((s) => s.pattern.test(stderr)).map((s) => s.id), ...matchSignatures(stderr).map((s) => s.id)];
 }
 
+/**
+ * Desktop scoping for the run verdict. `run` only ever drives the npm
+ * candidate it installed itself, so when the drilled sessions come from a
+ * desktop-hosted home the verdict describes the npm dependency closure and
+ * the session data format — never the desktop app's own update channel. A
+ * home counts as desktop-hosted when resolveHome discovered it from the host
+ * catalog (origin `desktop:<id>`) or when the live profile follows the
+ * measured desktop naming convention (`profiles/desktop`).
+ */
+export function desktopDataContext(origin, profileName, current, extra = {}) {
+  const viaOrigin = typeof origin === 'string' && origin.startsWith('desktop:') ? origin : null;
+  const viaProfile = profileName === 'desktop';
+  const host = {
+    homeOrigin: origin ?? null,
+    liveProfile: profileName ?? null,
+    currentRuntime: current ?? null,
+    desktopScoped: Boolean(viaOrigin || viaProfile),
+    scopedVia: [viaOrigin ? 'home-origin' : null, viaProfile ? 'profile-name' : null].filter(Boolean),
+    desktopApp: viaOrigin ? origin.slice('desktop:'.length) : null,
+    desktopRuntimeTested: false,
+  };
+  if (extra.currentAmbiguous) host.currentAmbiguous = extra.currentAmbiguous;
+  if (extra.runtimeSources?.length) host.runtimeSources = extra.runtimeSources;
+  if (!host.desktopScoped) return { scoped: false, host };
+  const via = viaOrigin ? `the ${host.desktopApp} desktop home` : `the desktop-named profile "${profileName}"`;
+  const runtime = current
+    ? `bundled desktop runtime detected: ${current}`
+    : 'bundled desktop runtime NOT detected (excluded-candidate plugins are classified high; re-run with --current to classify)';
+  const warning =
+    `desktop-scoped rehearsal: sessions come from ${via}; run drives the npm candidate headless against session COPIES — ` +
+    `verdicts cover the npm dependency closure and the session format, not the desktop app's own update channel. ${runtime}.`;
+  return { scoped: true, host, warning };
+}
+
+/**
+ * Pure-desktop ambiguity gate (plan §4.3): when no valid default home exists
+ * and TWO OR MORE desktop homes validate, `run` refuses to choose an
+ * experiment target implicitly — `check` (read-only) proceeds with the
+ * first and a warning. One validating candidate proceeds labelled.
+ */
+export function desktopAmbiguityGate(resolved) {
+  if (!resolved || typeof resolved.origin !== 'string' || !resolved.origin.startsWith('desktop:')) return { block: false };
+  if ((resolved.desktopCandidates ?? 0) < 2) return { block: false };
+  const ids = [resolved.origin, ...(resolved.alternates ?? [])].map((a) => a.replace(/^desktop:/, '')).join(', ');
+  return {
+    block: true,
+    message: `run needs an explicit --home: ${resolved.desktopCandidates} desktop homes validated (${ids}); pass --home <dir> to choose the rehearsal target`,
+  };
+}
+
 export async function cmdRun(opts) {
   if (!opts.to) throw new Error('run requires --to <version> (exact candidate version, e.g. 0.2.0-rc.2)');
-  const home = opts.home ?? defaultHome();
+  // Home resolution (desktop compatibility): --home > DSH_HOME > a validated
+  // default home > a validated host-catalog home. The origin rides in the
+  // report as a LABEL (never a path) so a desktop-discovered run is auditable.
+  const resolved = resolveHome(opts.home);
+  const home = resolved.home;
   const report = newReport({ candidateVersion: opts.to, profile: null, command: 'run' });
+  report.target.homeOrigin = resolved.origin;
   const artifactsDir = path.resolve(opts.artifacts ?? path.join(process.cwd(), '.dsh-rehearsal', `run-${opts.to}-${Date.now()}`));
   fs.mkdirSync(artifactsDir, { recursive: true });
+  const gate = desktopAmbiguityGate(resolved);
+  if (gate.block) {
+    report.warnings.push(gate.message);
+    finalize(report);
+    write(artifactsDir, report);
+    return { code: 3, report };
+  }
+  if (resolved.origin.startsWith('desktop:')) {
+    console.log(`  [run] home resolved from host catalog: ${resolved.origin.slice('desktop:'.length)}`);
+  }
+  if (resolved.alternates.length) {
+    report.warnings.push(`multiple valid homes detected (selected ${resolved.origin}; also valid: ${resolved.alternates.join(', ')}) — pass --home to disambiguate`);
+  }
   let code = 3;
 
   // ---- A: inventory + session classification
@@ -85,7 +153,18 @@ export async function cmdRun(opts) {
   // from the running installation so findings split into newly-broken-by-this-
   // upgrade (high/blocking) vs pre-existing (warn) — audit P2-1.
   ms = stageTimer();
-  const current = opts.current ?? detectCurrentDshVersion(home, live.name);
+  // --current is authoritative when given; otherwise probe the chain with
+  // provenance (profile node_modules → catalog bundles filtered by the home
+  // origin → npm prefix; desktop-host version conflicts resolve to null).
+  const evidence0 = opts.current
+    ? { version: opts.current, sources: [{ host: '--current', version: opts.current, source: '--current' }], ambiguous: null }
+    : runtimeEvidence(home, live.name, resolved.origin);
+  const current = evidence0.version;
+  const dctx = desktopDataContext(resolved.origin, live?.name ?? null, current, {
+    currentAmbiguous: evidence0.ambiguous ?? undefined,
+    runtimeSources: evidence0.sources,
+  });
+  if (dctx.scoped) report.warnings.push(dctx.warning);
   const nm = path.join(live.dir, 'node_modules');
   const pluginDetails = live.plugins.map((p) => {
     let peers = {}, deps = {};
@@ -105,8 +184,10 @@ export async function cmdRun(opts) {
     verdict: blocking.length ? 'fail' : findings.length ? 'warn' : 'pass',
     blocking: true,
     durationMs: ms(),
-    details: `${pluginDetails.length} plugins vs ${opts.to} (current=${current ?? 'unknown'}); ${findings.length} findings (${blocking.length} newly-broken high, ${preExisting.length} pre-existing)`,
-    evidence: findings,
+    details: `${pluginDetails.length} plugins vs ${opts.to} (current=${current ?? 'unknown'}); ${findings.length} findings (${blocking.length} newly-broken high, ${preExisting.length} pre-existing)${current ? '' : '; current unknown: excluded-candidate plugins are classified high (re-run with --current)'}`,
+    evidence: evidence0.sources.length
+      ? [...findings, { currentRuntime: { version: evidence0.version, sources: evidence0.sources, ambiguous: evidence0.ambiguous ?? undefined } }]
+      : findings,
   });
 
   // ---- C: shadow build
@@ -242,6 +323,7 @@ export async function cmdRun(opts) {
             : `${selectedPresetCount} preset session(s) drilled with the adoption-gate patch (${migratedPreset} migrated); their composition was NOT reconstructed, so those verdicts are format-level only`,
     },
   };
+  report.coverage.host = dctx.host;
 
   // ---- E2: keyless write round via @deepseek-ai/dsh-llm-replay
   // llm-replay ships no dsh.bundle: install only lands the dependency; the

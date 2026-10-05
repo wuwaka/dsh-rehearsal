@@ -29,6 +29,8 @@ Mechanically, the candidate `dsh` is a child process this tool npm-installs into
 | `src/commands/check.js` | read-only pre-flight (inventory + peer graph) |
 | `src/commands/run.js` | rehearsal pipeline and per-stage verdicts |
 | `src/lib/dshhome.js` | profile enumeration, current runtime detection |
+| `src/lib/desktops.js` | desktop host catalog: bundle and isolated-home candidates, provenance grades |
+| `src/lib/asar.js` | read-only asar reader: partial reads, in-archive paths, unpacked/link always miss |
 | `src/lib/sessions.js` | session discovery, stratified sampling, copies and cwd rewrite |
 | `src/lib/shadow.js` | candidate installation, replay patch generation, adoption-gate patch |
 | `src/lib/drill.js` | migration trigger, read-side integrity, write round and verdict aggregation |
@@ -57,6 +59,16 @@ install the candidate into a private prefix (--ignore-scripts by default)
 Two cold boots, because upstream [`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294) records a first cold boot after a batch plugin upgrade hitting a 30-second renderer health-report timeout while an identical configuration booted normally on the second attempt. One failure and one success is recorded as jitter, not as incompatibility.
 
 Every stage verdict is derived from artifacts. A *successful* keyless migration also exits `1` with `MISSING_CREDENTIAL`, and `--dump-config-schema` sets `exitCode=1` by design while writing valid JSON to stdout.
+
+## The desktop host catalog and home discovery
+
+The target home of `check` and `run` resolves as `--home` → `DSH_HOME` → the validated default home → the catalog. When none of the first three hits, the desktop hosts registered in `src/lib/desktops.js` (the official DeepSeek Harness Desktop, anywhere-labs' DSH Desktop, dataelement's DSHDesktop) offer candidates in registered order, each accepted only after structural validation (a profile with its package.json manifest, or real session generation logs under sessions); myYangyunfan and vibeinging keep homes identical to the default and expose no readable runtime marker, so they are not catalogued. Path evidence is registered per candidate in three grades: measured on a machine, measured from source (baseline commits: official `5badb15`, anywhere-labs `a1ff68b`, dataelement `beb6821`), inferred; provenance never affects selection priority.
+
+The official desktop's dsh runtime tree lives inside the `dsh/` subtree of `resources/app.asar`; the version comes from the in-archive `dsh/desktop-runtime.json` `sharedPackages` (an array, with upstream pinning the `@deepseek-ai/dsh` version equal to `release.version`), read by the zero-dependency `src/lib/asar.js`: read-only, partial reads, `unpacked`/`link` entries are always misses. anywhere-labs' bundled runtime is directly readable through the unpacked `resources/app`.
+
+`current` resolves in tiers: a profile-scoped install is authoritative when it parses; otherwise desktop bundles are filtered by the home's origin — a desktop-origin home trusts only its own host, a shared home probes all hosts, and conflicting versions resolve to null with the contenders listed as `currentAmbiguous`; the npm global prefix only fills in when everything above misses. With `current` unknown, plugins whose peer range excludes the candidate are classified high, and the report states that consequence and points at `--current`.
+
+`run` demands an explicit `--home` on pure-desktop ambiguity (no valid default home and ≥2 validating desktop homes); a single candidate proceeds automatically, and `check` always proceeds. Desktop-sourced rehearsals carry a scoping warning and `coverage.host` (`desktopRuntimeTested: false`) in the report.
 
 ## Three layers suppressing the write round
 
@@ -116,5 +128,8 @@ Facing the same corruption class, `gating-hub` rewrites producer source (contrac
 | Undecidable | 不可判定 | `inconclusive` |
 | Already broken today | 既存失配 | `pre-existing` |
 | Removing sensitive text | 脱敏 | redaction |
+| Desktop host | 桌面宿主 | desktop host |
+| Desktop host catalog | 探测表 | host catalog |
+| Home origin | home 来源 | home origin |
 
 Status vocabulary is fixed: **Tested** (actually executed), **Inferred** (derived from code, never executed), **Not tested**, **Unsupported** (refused by design), **Not covered** (deliberately excluded).

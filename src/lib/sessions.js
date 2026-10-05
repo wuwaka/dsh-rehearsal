@@ -21,7 +21,10 @@ import path from 'node:path';
 import { zstdCompressSync } from 'node:zlib';
 import { decodeAll } from './zfstd.js';
 
-const GEN_RE = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/;
+// Session filename generations: `session.jsonl`, `session.v3.jsonl.zstd`, …
+// Shared with dshhome.looksLikeDshHome (a home is real when a session
+// generation file actually exists under sessions/<ws>/<id>/).
+export const GEN_RE = /^session(?:\.v(\d+))?\.jsonl(?:\.zstd)?$/;
 
 export function discoverSessions(home) {
   const root = path.join(home, 'sessions');

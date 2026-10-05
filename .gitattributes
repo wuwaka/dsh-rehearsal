@@ -1,3 +1,6 @@
 # Cross-platform CI (Windows/macOS/Linux) must not see different line endings.
 # Local core.autocrlf=true otherwise rewrites every .js/.md on checkout.
 * text=auto eol=lf
+# The committed asar fixture is a binary archive (real @electron/asar output);
+# line-ending normalization would corrupt its byte offsets.
+*.asar -text

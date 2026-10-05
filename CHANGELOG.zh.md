@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+### 新增
+
+- 桌面宿主兼容：`check` 与 `run` 无需 `--home` 即可发现官方 DeepSeek Harness Desktop 与社区桌面（anywhere-labs `DSH Desktop`、dataelement `DSHDesktop`）的 home——`--home` 与 `DSH_HOME` 缺省、默认 home 不存在或不是真实数据时，按登记顺序逐宿主探测并验证（必须存在 profile manifest 或真实会话日志）；报告以 `target.homeOrigin` 标签记录来源，不写路径。
+- 版本探测走探测表：官方运行时整树在 `resources/app.asar` 档内，由零依赖只读读取器读取 `dsh/desktop-runtime.json`（`sharedPackages` 为数组，取 `@deepseek-ai/dsh` 条目并与 `release.version` 交叉校验）；桌面来源的 home 只信自己宿主的内置运行时，共享 home 上多宿主版本冲突返回 null 并以 `currentAmbiguous` 列出各宿主的版本，npm 全局前缀只在其他来源全部落空时参与。
+- 桌面来源的 `run` 预演附带范围警告与 `coverage.host`（`desktopRuntimeTested: false`）：判定覆盖 npm 依赖闭包与会话数据格式，不覆盖桌面应用自身的更新通道；纯桌面歧义（无有效默认 home 且 ≥2 个桌面 home 验证通过）时 `run` 要求显式 `--home`，`check` 全自动。
+- 发现、探测与范围判定附带 25 条回归锁：从探测表顺序漂移锁定、真实工具生成的 asar 夹具，到双宿主版本冲突用例（测试数 81 → 106）。
+
 ## [0.2.2] - 2026-10-04
 
 文档、徽章与安装元数据，外加一处内部常量收敛。`check` 与 `run` 的行为**没有任何改动**。
@@ -180,7 +189,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0

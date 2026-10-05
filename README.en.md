@@ -66,7 +66,7 @@ Common options:
 
 | Option | Purpose |
 |---|---|
-| `--profile` / `--home` | Select the profile and `DSH_HOME` |
+| `--profile` / `--home` | Select the profile and `DSH_HOME`; without `--home`, resolution is `DSH_HOME` → the validated default home → registered desktop hosts (official DeepSeek Harness Desktop; community DSH Desktop / DSHDesktop) |
 | `--sample N` / `--full` | Limit or lift the session count |
 | `--skip-write` | Skip write rounds |
 | `--keep` | Keep shadow data for debugging (contains plaintext session copies) |
@@ -88,7 +88,7 @@ rollback note: sessions migrated to v4 are REFUSED (not rewritten) by older host
 downgrade after migration is not possible; rollback relies on a pre-upgrade snapshot
 ```
 
-`home=default`, not a path: the DSH_HOME field in a report records a shape (`default` / `custom`), so no absolute path enters the string.
+`home=default`, not a path: the DSH_HOME field in a report records a shape or an origin (`default` / `custom` / `desktop:<host-id>`), so no absolute path enters the string.
 
 Exit codes:
 
@@ -136,7 +136,7 @@ Exact guarantees, explicitly dangerous options, and what is out of scope: [SECUR
 | Node.js | `>=22.19` (needs `node:zlib` zstd) |
 | `run` | Tested: real sessions on Windows |
 | `check` | Tested: Windows; CI: macOS / Linux / Windows |
-| Desktop-managed profiles | `check` supported; `run` not supported (design decision) |
+| Desktop-managed profiles | Session-migration rehearsal Tested (official and community desktop homes auto-discovered); the bundled desktop runtimes Not tested (rehearsal drives the npm candidate; scoping warning in the report) |
 | Candidate source | npm / self-hosted `web` and `headless` profiles |
 | Runtime dependency | `semver` |
 
@@ -144,7 +144,7 @@ Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session 
 
 ## Limitations
 
-- `run` cannot rehearse an Electron-managed `desktop` profile: the npm candidate and the Desktop bundle are different dependency closures, and `dsh` refuses the profile outright.
+- `run` rehearses the npm candidate it installs itself, not a desktop app's bundled runtime: for a desktop-managed home, verdicts cover the npm dependency closure and the session data format; the desktop app's own update channel is out of scope (a scoping warning and the `coverage.host` field in the report state this).
 - Write-round coverage is narrower than migration coverage, see [Coverage](#coverage).
 - Sessions carrying an `agentPreset` are format-tested only; the preset composition is not rebuilt.
 - Attachment side data (`~/.dsh/attachments` and friends) is neither copied nor verified.

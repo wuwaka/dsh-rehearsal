@@ -66,7 +66,7 @@ dsh-rehearsal clean --yes                       # 清理产物
 
 | 选项 | 作用 |
 |---|---|
-| `--profile` / `--home` | 指定 profile 与 `DSH_HOME` |
+| `--profile` / `--home` | 指定 profile 与 `DSH_HOME`；省略 `--home` 时按 `DSH_HOME` → 默认 home → 已登记桌面宿主（官方 DeepSeek Harness Desktop、社区 DSH Desktop/DSHDesktop）的顺序发现并验证 |
 | `--sample N` / `--full` | 限制或放开参与预演的会话数 |
 | `--skip-write` | 跳过写回合 |
 | `--keep` | 保留影子数据用于调试（内含会话明文副本） |
@@ -88,7 +88,7 @@ rollback note: sessions migrated to v4 are REFUSED (not rewritten) by older host
 downgrade after migration is not possible; rollback relies on a pre-upgrade snapshot
 ```
 
-`home=default` 而不是路径：报告里的 DSH_HOME 字段只写形状（`default` / `custom`），绝对路径不进入字符串。
+`home=default` 而不是路径：报告里的 DSH_HOME 字段只写形状或来源（`default` / `custom` / `desktop:<host-id>`），绝对路径不进入字符串。
 
 退出码：
 
@@ -136,7 +136,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 | Node.js | `>=22.19`（需 `node:zlib` 的 zstd） |
 | `run` | Tested：Windows 真机会话 |
 | `check` | Tested：Windows；CI：macOS / Linux / Windows |
-| Desktop 托管 profile | `check` 支持；`run` 不支持（设计决定） |
+| Desktop 托管 profile | 会话迁移演练 Tested（官方与社区桌面 home 自动发现）；桌面内置运行时 Not tested（预演对象为 npm 候选，报告带范围警告） |
 | 候选来源 | npm / 自托管的 `web`、`headless` profile |
 | 运行时依赖 | `semver` |
 
@@ -144,7 +144,7 @@ Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代
 
 ## 限制
 
-- `run` 无法预演 Electron 托管的 `desktop` profile：npm 候选与 Desktop 内置体是两套依赖闭包，且 `dsh` 直接拒绝。
+- `run` 预演的是自装 npm 候选，不是桌面应用内置运行时：对桌面托管的 home，判定覆盖 npm 依赖闭包与会话数据格式，桌面应用自身的更新通道不在预演范围内（警告与报告中的 `coverage.host` 字段写明这一范围）。
 - 写回合覆盖窄于迁移覆盖，见[覆盖范围](#覆盖范围)。
 - 带 `agentPreset` 的会话只做格式级验证，预设组合不重建。
 - 附件旁路数据（`~/.dsh/attachments` 等）不复制、不校验。

@@ -11,6 +11,15 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
+### Added
+
+- Desktop-host compatibility: `check` and `run` discover the homes of the official DeepSeek Harness Desktop and community desktops (anywhere-labs `DSH Desktop`, dataelement `DSHDesktop`) without `--home` — when neither `--home` nor `DSH_HOME` is set and the default home is absent or not a real home, catalog candidates are probed and validated in registered order (a profile manifest or real session logs must exist); reports record the origin as a `target.homeOrigin` label, never a path.
+- Version detection goes through the catalog: the official runtime lives inside `resources/app.asar`, read by a zero-dependency read-only asar reader from `dsh/desktop-runtime.json` (the `sharedPackages` array is searched for `@deepseek-ai/dsh` and cross-checked against `release.version`); a desktop-origin home trusts only its own host's bundle, conflicting bundled versions on a shared home resolve to null with the contenders listed as `currentAmbiguous`, and the npm global prefix only fills in when every other source misses.
+- Desktop-sourced `run` rehearsals carry a scoping warning and a `coverage.host` block (`desktopRuntimeTested: false`): verdicts cover the npm dependency closure and the session data format, not the desktop app's own update channel; with pure-desktop ambiguity (no valid default home and ≥2 validating desktop homes) `run` demands an explicit `--home`, while `check` proceeds automatically.
+- Discovery, probing and scoping come with 25 regression locks, from the catalog order drift-lock to a real-tool asar fixture and a dual-host version-conflict case (test count 81 → 106).
+
 ## [0.2.2] - 2026-10-04
 
 Documentation, badges and install metadata, plus one internal constant consolidation. The behaviour of `check` and `run` is **unchanged**.
@@ -237,7 +246,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wuwaka/dsh-rehearsal/releases/tag/v0.2.0

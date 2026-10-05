@@ -29,6 +29,8 @@ README 只回答"是什么、怎么跑、结果意味着什么"。这份文档�
 | `src/commands/check.js` | 只读预检（盘点 + peer 图） |
 | `src/commands/run.js` | 预演流水线与各阶段判定 |
 | `src/lib/dshhome.js` | profile 枚举、当前运行时探测 |
+| `src/lib/desktops.js` | 桌面宿主探测表：应用束与隔离 home 候选、来源分级 |
+| `src/lib/asar.js` | 只读 asar 读取器：部分读取、档内路径、unpacked/link 一律 miss |
 | `src/lib/sessions.js` | 会话发现、分类采样、副本与 cwd 重写 |
 | `src/lib/shadow.js` | 候选安装、replay patch 生成、采用闸门补丁 |
 | `src/lib/drill.js` | 迁移触发、读侧完整性、写回合与判定聚合 |
@@ -57,6 +59,16 @@ peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断�
 两次冷启动的依据是上游 [`#1294`](https://github.com/anywhere-labs/dsh-desktop/issues/1294)：插件批量升级后首次冷启动出现 renderer 30 秒健康上报超时，相同配置第二次启动即正常。一次失败一次成功记为抖动，不记为不兼容。
 
 所有阶段判定只看产物。无键迁移**成功**时同样以 `MISSING_CREDENTIAL` 退出 1；`--dump-config-schema` 按设计在成功时置 `exitCode=1` 并把合法 JSON 写到 stdout。
+
+## 桌面宿主探测表与 home 发现
+
+`check` 与 `run` 的目标 home 按 `--home` → `DSH_HOME` → 已验证的默认 home → 探测表的顺序解析。前三档未命中时，`src/lib/desktops.js` 登记的桌面宿主（官方 DeepSeek Harness Desktop、anywhere-labs 的 DSH Desktop、dataelement 的 DSHDesktop）按登记顺序给出候选，逐一通过结构验证（存在带 package.json 的 profile，或 sessions 下存在真实代际日志）才被采用；myYangyunfan 与 vibeinging 的 home 与默认重合且无可读运行时标记，不设条目。路径证据分三档随条目登记：实测-本机、实测-源码（基线提交：官方 `5badb15`、anywhere-labs `a1ff68b`、dataelement `beb6821`）、推断；来源分级不参与选择优先级。
+
+官方桌面的 dsh 运行时整树在 `resources/app.asar` 的 `dsh/` 子树内，版本取自档内 `dsh/desktop-runtime.json` 的 `sharedPackages`（数组，上游强制 `@deepseek-ai/dsh` 版本与 `release.version` 相等），读取由零依赖的 `src/lib/asar.js` 完成：只读、部分读取、`unpacked`/`link` 条目一律 miss。anywhere-labs 的内置运行时经未打包的 `resources/app` 直接可读。
+
+`current` 的解析分层：profile 内安装命中即权威；否则桌面内置运行时按 home 来源过滤——桌面来源的 home 只信自己宿主的 bundle，共享 home 探全部宿主，版本冲突返回 null 并以 `currentAmbiguous` 列出各宿主的版本；npm 全局前缀只在前面全部落空时兜底。current 未知时，peer 范围排除候选的插件按 high 分级，报告写明该后果，并指向 `--current`。
+
+`run` 对纯桌面歧义（无有效默认 home 且 ≥2 个验证通过的桌面 home）要求显式 `--home`；唯一候选自动进行，`check` 全自动。桌面来源的预演在报告中带范围警告与 `coverage.host`（`desktopRuntimeTested: false`）。
 
 ## 写回合的三层抑制
 
@@ -116,5 +128,8 @@ one-shot runner 拒绝携带 `agentPreset` 的会话。`--preset-mode patch` 在
 | 无法判定 | 不可判定 | `inconclusive` |
 | 既有问题 | 既存失配 | `pre-existing` |
 | 脱敏 | 脱敏 | redaction |
+| 桌面宿主 | 桌面宿主 | desktop host |
+| 桌面宿主探测表 | 探测表 | host catalog |
+| home 来源 | home 来源 | home origin |
 
 状态词统一为：**Tested**（实际跑过）、**Inferred**（代码分析得出、未真实运行）、**Not tested**、**Unsupported**（明确不支持）、**Not covered**（有意不覆盖）。

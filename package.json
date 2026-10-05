@@ -1,6 +1,6 @@
 {
   "name": "dsh-rehearsal",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Upgrade rehearsal CLI for DeepSeek Harness (dsh): static peer-graph pre-flight plus keyless real-session migration and write-round drills against a candidate dsh version, in a throwaway DSH_HOME. Keyless by design; reports carry no message bodies and no user paths.",
   "type": "module",
   "license": "MIT",

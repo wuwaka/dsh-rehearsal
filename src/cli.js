@@ -40,6 +40,12 @@ Commands:
   report <dir> [--format json|md]
       Re-render a report directory.
 
+Home discovery (check/run): --home > $DSH_HOME > a validated default home
+(~/.dsh) > a validated host-catalog home (official DeepSeek Harness Desktop;
+community DSH Desktop, DSHDesktop). Desktop-origin homes are labelled in
+reports (never their paths); run proceeds on a single validating desktop home
+and demands --home when several validate.
+
 Safety rules baked in:
   - the ONLY dsh binary invoked is one we npm-install ourselves (the PATH
     desktop shim ignores DSH_HOME and can touch your real home)
