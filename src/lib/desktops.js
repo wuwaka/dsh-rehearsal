@@ -108,13 +108,18 @@ export const DESKTOP_HOSTS = [
     id: 'dshdesktop-dataelement',
     label: 'DSHDesktop (dataelement community)',
     homes: [
-      // The only ISOLATED home in the catalog: userData is explicitly
-      // redirected to appData/dsh-desktop (src/main/index.ts:519,524) and the
-      // harness home is {userData}/harness. Their own code reads
-      // profiles/<p>/package.json (host-plugin-state.ts:35 and others), which
-      // is what looksLikeDshHome checks.
-      { platform: 'win32', env: 'APPDATA', segs: ['dsh-desktop', 'harness'], note: 'measured-source' },
-      { platform: 'darwin', env: 'HOME', segs: ['Library', 'Application Support', 'dsh-desktop', 'harness'], note: 'measured-source' },
+    // The only ISOLATED home in the catalog: userData is explicitly
+    // redirected to appData/dsh-desktop (src/main/index.ts:519,524) and the
+    // harness home is {userData}/harness. Their own code reads
+    // profiles/<p>/package.json (host-plugin-state.ts:35 and others), which
+    // is what looksLikeDshHome checks. appData is platform-dependent:
+    // %APPDATA% on Windows, ~/Library/Application Support on macOS,
+    // $XDG_CONFIG_HOME or ~/.config on Linux — the same setPath line on all
+    // three platforms.
+    { platform: 'win32', env: 'APPDATA', segs: ['dsh-desktop', 'harness'], note: 'measured-source' },
+    { platform: 'darwin', env: 'HOME', segs: ['Library', 'Application Support', 'dsh-desktop', 'harness'], note: 'measured-source' },
+    { platform: 'linux', env: 'XDG_CONFIG_HOME', segs: ['dsh-desktop', 'harness'], note: 'measured-source' },
+    { platform: 'linux', env: 'HOME', segs: ['.config', 'dsh-desktop', 'harness'], note: 'measured-source' },
     ],
     // Harness runs under Electron's Node mode (electron-node-executable.ts:
     // "no longer ships a standalone Node"); no externally readable version

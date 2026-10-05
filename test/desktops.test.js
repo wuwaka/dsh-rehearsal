@@ -47,12 +47,21 @@ function makeProfile(home, name = 'web') {
   return prof;
 }
 
-function makeDataelementHome(appDataDir) {
-  return makeProfile(path.join(appDataDir, 'dsh-desktop', 'harness'));
-}
-
 function makeBetaHome(homeBase) {
   return makeProfile(path.join(homeBase, '.dsh-beta'));
+}
+
+/**
+ * Create the dataelement fixture AT the path the catalog actually probes on
+ * this platform (APPDATA on win32, HOME on darwin, XDG_CONFIG_HOME/HOME on
+ * linux) — a hand-joined path is how the macOS/Linux CI run drifted from the
+ * catalog and lost discovery.
+ */
+function makeDataelementHome() {
+  const host = DESKTOP_HOSTS.find((h) => h.id === 'dshdesktop-dataelement');
+  const c = homeCandidates(host);
+  assert.ok(c.length, 'dataelement must expose a home candidate on this platform');
+  return makeProfile(c[0].home);
 }
 
 function installOfficial(localAppData, asarBytes) {
@@ -184,7 +193,7 @@ test('T3 resolveHome: a valid default home wins; catalog homes become alternates
   const dir = envSandbox(t);
   process.env.APPDATA = dir;
   makeProfile(path.join(dir, '.dsh'));
-  makeDataelementHome(dir);
+  makeDataelementHome();
   const r = resolveHome();
   assert.equal(r.origin, 'default');
   assert.deepEqual(r.alternates, ['desktop:dshdesktop-dataelement']);
@@ -196,7 +205,7 @@ test('T3 resolveHome: an invalid (empty) default home does not shadow catalog di
   const dir = envSandbox(t);
   process.env.APPDATA = dir;
   fs.mkdirSync(path.join(dir, '.dsh'), { recursive: true });
-  makeDataelementHome(dir);
+  makeDataelementHome();
   const r = resolveHome();
   assert.equal(r.origin, 'desktop:dshdesktop-dataelement');
   assert.equal(r.desktopCandidates, 1);
@@ -206,7 +215,7 @@ test('T3 resolveHome: an invalid (empty) default home does not shadow catalog di
 test('T3 resolveHome: pure-desktop ambiguity surfaces for run to gate on', (t) => {
   const dir = envSandbox(t);
   process.env.APPDATA = dir;
-  makeDataelementHome(dir);
+  makeDataelementHome();
   makeBetaHome(dir);
   const r = resolveHome();
   assert.equal(r.origin, 'desktop:dsh-desktop-anywhere-labs', 'catalog order is the priority');
@@ -408,7 +417,7 @@ test('T8 desktopDataContext: scoping, honesty fields and warning wording', () =>
 test('T9 run gates on pure-desktop ambiguity before any network work', async (t) => {
   const dir = envSandbox(t);
   process.env.APPDATA = dir;
-  makeDataelementHome(dir);
+  makeDataelementHome();
   makeBetaHome(dir);
   const { code, report } = await cmdRun({ to: '0.2.0-rc.2', artifacts: path.join(dir, 'artifacts') });
   assert.equal(code, 3);
@@ -423,7 +432,7 @@ test('T9 run gates on pure-desktop ambiguity before any network work', async (t)
 test('T10 check discovers a dataelement home end-to-end, labels the origin, leaks no path', (t) => {
   const dir = envSandbox(t);
   process.env.APPDATA = dir;
-  makeDataelementHome(dir);
+  makeDataelementHome();
   const artifacts = path.join(dir, 'artifacts');
   const r = spawnSync(process.execPath, [CLI, 'check', '--artifacts', artifacts], {
     encoding: 'utf8', env: process.env, windowsHide: true, timeout: 120000,
