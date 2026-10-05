@@ -44,9 +44,10 @@ function expandTilde(p) {
  * for catalog-discovered homes, so an inferred path can only ever degrade
  * into "not found", never into rehearsing the wrong target. A home counts
  * when it holds REAL harness data:
- *   - a profile whose manifest carries the harness `dsh` field (what the
- *     harness writes into profiles/<name>/package.json; a random sibling
- *     project named profiles/foo/package.json does not qualify), or
+ *   - a profile whose manifest carries the harness composition structure
+ *     (`dsh.profile.bundles` as an array — what the harness writes and what
+ *     inspectProfile() itself reads; a random sibling project, or a manifest
+ *     with an empty `dsh: {}`, does not qualify), or
  *   - a session generation file under sessions/<ws>/<id>/ (bare directories
  *     do not qualify).
  */
@@ -58,7 +59,7 @@ export function looksLikeDshHome(dir) {
         if (!e.isDirectory() || e.name === 'node_modules' || e.name.startsWith('.')) continue;
         try {
           const pkg = JSON.parse(fs.readFileSync(path.join(profilesDir, e.name, 'package.json'), 'utf8'));
-          if (pkg && typeof pkg === 'object' && pkg.dsh && typeof pkg.dsh === 'object') return true;
+          if (pkg && typeof pkg === 'object' && Array.isArray(pkg.dsh?.profile?.bundles)) return true;
         } catch { /* no or unreadable manifest: keep looking */ }
       }
     }

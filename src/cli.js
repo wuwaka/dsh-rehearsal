@@ -52,7 +52,10 @@ Safety rules baked in:
   - DSH_TELEMETRY_MODE=DISABLED and DEEPSEEK_API_KEY removed for every child
   - verdicts come from artifacts, never from exit codes (a successful keyless
     migration exits 1 with MISSING_CREDENTIAL)
-  - reports never contain message content; paths are scrubbed
+  - reports never contain message content; paths are scrubbed, and a report
+    whose scrub invariant fails is refused, not written
+  - --shadow-dir / --prefix-dir are never auto-cleaned (a shadow dir holds
+    plaintext session copies); clean --yes only removes the default directory
 `;
 
 function parseArgs(argv) {

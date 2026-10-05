@@ -9,11 +9,37 @@ import { extractRoutes } from '../src/lib/drill.js';
 import path_module from 'node:path';
 
 test('scrubText removes user paths and credential shapes', () => {
-  const s = scrubText('cwd was C:\\Users\\Jane\\AppData\\Local\\Temp and /home/alice/x and key sk-abcdefghijklmnop1234 Bearer abc.def');
+  // field-delimited input: scrubText consumes paths to the field boundary
+  // (documented trade-off: over-masking a prose span beats leaking a tail),
+  // so a delimiter-free sentence legitimately collapses into one mask
+  const s = scrubText('cwd was C:\\Users\\Jane\\AppData\\Local\\Temp; also /home/alice/x; key sk-abcdefghijklmnop1234; Bearer abc.def');
   assert.ok(!s.includes('Jane'));
   assert.ok(!s.includes('alice'));
   assert.ok(s.includes('sk-[redacted]'));
   assert.ok(s.includes('Bearer [redacted]'));
+});
+
+test('home paths leave no tail, spaced or not (review round 5 P1-1)', () => {
+  // pre-fix, the home rules stopped at whitespace: `C:\Users\John Smith\.dsh`
+  // became `~ Smith\.dsh` and even an unspaced home kept everything after it
+  // (`~\AppData\Local\Temp\run-1`) because the orphaned tail no longer looked
+  // absolute to the invariant
+  const spaced = scrubText('p=D:\\Users\\Jane\\My Docs\\secret.txt; end');
+  assert.ok(!spaced.includes('My Docs'), spaced);
+  assert.ok(!spaced.includes('secret'), spaced);
+  assert.ok(spaced.includes('<abs-path>'), 'a spaced home field escalates to <abs-path>');
+  const posix = scrubText('p=/home/jane/My Docs/secret.txt; end');
+  assert.ok(!posix.includes('My Docs'), posix);
+  assert.ok(!posix.includes('secret'), posix);
+  const surname = scrubText('u=C:\\Users\\John Smith\\.dsh; end');
+  assert.ok(!surname.includes('Smith'), surname);
+  const plain = scrubText('h=C:\\Users\\Jane\\AppData\\Local\\Temp\\run-1; end');
+  assert.ok(!plain.includes('AppData'), plain);
+  assert.ok(!plain.includes('run-1'), plain);
+  assert.ok(plain.includes('~'), 'a clean home path still normalises to ~');
+  const posixPlain = scrubText('h=/home/jane/AppData/run-1; end');
+  assert.ok(!posixPlain.includes('AppData'), posixPlain);
+  assert.ok(posixPlain.includes('~'));
 });
 
 test('verdict aggregation: blocking fail -> do-not-upgrade', () => {
@@ -238,7 +264,9 @@ test('homeShape and defaultHome agree on what the default location is', async ()
   assert.equal(homeShape('/somewhere/else', d), 'custom');
 });
 
-test('an unknown path shape is surfaced as a warning, not shipped silently', () => {
+test('an unknown path shape marks the report unscrubbed and writeReport refuses it (round 5 P1-2)', (t) => {
+  const dir = fs.mkdtempSync(path_module.join(os.tmpdir(), 'dsh-gap-refuse-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'run' });
   addStage(r, {
     id: 'x-unknown-field',
@@ -252,6 +280,10 @@ test('an unknown path shape is surfaced as a warning, not shipped silently', () 
   r.stages[0].scratch = 'mnt=/mnt/Data Disk/dsh-shadow-1';
   finalize(r);
   assert.ok(r.warnings.some((w) => /redaction gap/.test(w)), 'the invariant must flag what the filter missed');
+  assert.equal(r.privacy.scrubbed, false, 'an unmet invariant must not claim scrubbed');
+  // fail-closed: the earlier behaviour warned and wrote the leak anyway
+  assert.throws(() => writeReport(dir, r), /refusing to write an unsanitised report/, 'writeReport must refuse');
+  assert.equal(fs.existsSync(path_module.join(dir, 'report.json')), false, 'nothing may reach disk');
 });
 
 test('homeShape describes a DSH_HOME without ever returning its path', () => {

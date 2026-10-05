@@ -15,7 +15,7 @@
 | 会话副本的 `cwd` 被重写进影子目录，同时迁入对应的编码工作区目录 | `src/lib/sessions.js` `copySet` |
 | 任何形如凭据的环境变量都不会传入子进程；报告只记录被剔除的变量名 | `src/lib/util.js:66-85` |
 | 遥测强制关闭（`DSH_TELEMETRY_MODE=DISABLED`） | `src/lib/util.js:85` |
-| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:202`；另有测试对最终报告 grep 家目录与推理标记 |
+| 报告不含消息正文与用户路径：`stderr` 只保留诊断行，evidence 对象逐字符串脱敏，`finalize()` 清理每个阶段、coverage、target 与 warnings | `src/lib/report.js:210`；另有测试对最终报告 grep 家目录与推理标记 |
 | 默认同时按行 id 与包名前缀抑制工具提供方；仅当会话历史中的全部工具都在只读允许清单内时才演练（fail-closed） | `src/lib/shadow.js`、`src/lib/drill.js` |
 | 影子 home 内含明文会话副本，所有退出路径都会删除，结果记录为 `shadowCleanup` | `src/commands/run.js` |
 
@@ -28,19 +28,19 @@
 | 旗标 | 后果 |
 |---|---|
 | `--allow-tools` | 执行会话历史中记录的工具调用。沙箱 `cwd` 仍然生效，但 `pwsh`、`bash` 或任意绝对路径可以越出该目录。执行前会打印横幅 |
-| `--keep` | 把会话的明文副本留在影子 home 与安装前缀中。不受控制的机器上不要使用，事后执行 `dsh-rehearsal clean --yes` |
+| `--keep` | 把会话的明文副本留在影子 home 与安装前缀中。不受控制的机器上不要使用，事后执行 `dsh-rehearsal clean --yes`（`--shadow-dir` 与 `--prefix-dir` 指定的目录同样不会自动清理，也不归 `clean` 管——它只处理默认产物目录） |
 | `--run-scripts` | 让候选安装执行第三方生命周期脚本。默认 `--ignore-scripts`，与官方 pnpm 配置中很短的构建脚本白名单一致 |
 
 ## 报告是敏感数据
 
 `report.json` 与 `report.md` 派生自本地会话数据。脱敏是过滤器，不是证明：不要把报告文件或 `run` 输出粘贴到公开 issue。两份文件只留在磁盘上，本工具不上传任何内容。
 
-过滤器覆盖的形状：`C:\Users\<n>`、`/home/<n>`、`/Users/<n>` 归一为 `~`；任意盘符路径、任意 POSIX 绝对路径（含 `/root/.dsh`、`/var/lib/<服务名>`、`/srv/<团队>`、`/tmp/<影子目录>`）、UNC 共享 `\\server\share\…`、以及 `../` 形式的上级相对路径，一律归一为 `<abs-path>` / `<unc-path>` / `<rel-path>`。仓库相对文本（`src/lib/drill.js:217`、`sessions/<ws>/…`）与 URL 有意保留，各有测试锁定。
+过滤器覆盖的形状：`C:\Users\<n>`、`/home/<n>`、`/Users/<n>` 归一为 `~`（home 字段含空格时整段升级为 `<abs-path>`，不留尾巴）；任意盘符路径、任意 POSIX 绝对路径（含 `/root/.dsh`、`/var/lib/<服务名>`、`/srv/<团队>`、`/tmp/<影子目录>`）、UNC 共享 `\\server\share\…`、以及 `../` 形式的上级相对路径，一律归一为 `<abs-path>` / `<unc-path>` / `<rel-path>`。仓库相对文本（`src/lib/drill.js:217`、`sessions/<ws>/…`）与 URL 有意保留，各有测试锁定。
 
 两道结构性保障，而不是继续加正则：
 
 - **能不写路径就不写**。DSH_HOME 这类字段只写形状或来源（`home=default|custom|desktop:<host-id>|unknown`），路径根本不进入字符串。
-- **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它每次落盘都重新 `finalize()`：`scrubbed` 是结果，不是跳过检查的令牌，finalize 之后被追加的字段同样会被清理。于是将来某个新阶段拼出未覆盖的路径形状时，报告会带着 `redaction gap` 警告落盘，而不是无声通过。
+- **漏网即拒写**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它每次落盘都重新 `finalize()` 且 fail-closed：`scrubbed` 不是 `true` 时**拒绝写盘**（抛错退出），而不是把未脱敏的原值写进磁盘——一条和泄漏数据并排的警告不是闸门。将来某个新阶段拼出未覆盖的路径形状时，工具会拒绝出报告并指出缺口数量，修好过滤规则再重新运行。
 
 仍要说清的是：这依然是尽力而为的过滤，不是证明。
 

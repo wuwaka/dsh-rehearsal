@@ -15,7 +15,7 @@ The properties below are enforced in code and covered by tests. A report that an
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
 | No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:66-85` |
 | Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:85` |
-| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:202`; a separate test greps the finished report for home paths and reasoning markers |
+| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings | `src/lib/report.js:210`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
 | The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
 
@@ -28,19 +28,19 @@ The failure direction of the tool-suppression list (`src/lib/shadow.js:138`) is 
 | Flag | Consequence |
 |---|---|
 | `--allow-tools` | Executes the tool calls recorded in session history. The sandboxed `cwd` still applies, but `pwsh`, `bash` or any absolute path can leave that directory. A banner is printed before execution |
-| `--keep` | Leaves plaintext session copies in the shadow home and the install prefix. Do not use it on an unmanaged machine; remove the output afterwards with `dsh-rehearsal clean --yes` |
+| `--keep` | Leaves plaintext session copies in the shadow home and the install prefix. Do not use it on an unmanaged machine; remove the output afterwards with `dsh-rehearsal clean --yes` (`--shadow-dir` and `--prefix-dir` are never auto-cleaned either, and `clean` does not touch them — it only removes the default artifacts directory) |
 | `--run-scripts` | Lets the candidate install run third-party lifecycle scripts. The default is `--ignore-scripts`, matching the short build-script list the official pnpm setup whitelists |
 
 ## Reports are sensitive data
 
 `report.json` and `report.md` derive from local session data. Redaction is a filter, not a proof: do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
-Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse to `~`; any drive-rooted path, any POSIX absolute path (including `/root/.dsh`, `/var/lib/<service>`, `/srv/<team>` and `/tmp/<shadow>`), any UNC share `\\server\share\…` and any parent-relative `../` collapse to `<abs-path>` / `<unc-path>` / `<rel-path>`. Repository-relative text (`src/lib/drill.js:217`, `sessions/<ws>/…`) and URLs are preserved on purpose, each with a test pinning it.
+Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse to `~` (a home field containing spaces escalates to `<abs-path>` as a whole, leaving no tail); any drive-rooted path, any POSIX absolute path (including `/root/.dsh`, `/var/lib/<service>`, `/srv/<team>` and `/tmp/<shadow>`), any UNC share `\\server\share\…` and any parent-relative `../` collapse to `<abs-path>` / `<unc-path>` / `<rel-path>`. Repository-relative text (`src/lib/drill.js:217`, `sessions/<ws>/…`) and URLs are preserved on purpose, each with a test pinning it.
 
 Two structural guarantees rather than more regexes:
 
 - **shapes instead of paths**. Fields such as DSH_HOME record a shape or an origin (`home=default|custom|desktop:<host-id>|unknown`), so no path ever enters the string.
-- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. `writeReport()` is the only writer, and it re-runs `finalize()` on EVERY write: `scrubbed` is a result, not a skip token, so a field appended after a previous finalize is scrubbed too. A future stage that composes a new path shape therefore lands in the report as a `redaction gap` warning instead of passing silently.
+- **survivors mean refusal, not a warning**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. `writeReport()` is the only writer, and it re-runs `finalize()` on EVERY write and is fail-closed: when `scrubbed` is not `true` it REFUSES to publish (throws) instead of writing the unmasked value to disk — a warning next to leaked data is not a gate. A future stage that composes a new path shape therefore makes the tool refuse to emit a report and report the gap count, rather than shipping a file whose privacy block contradicts its contents.
 
 This remains best-effort filtering, not a proof.
 

@@ -71,6 +71,7 @@ Common options:
 | `--sample N` / `--full` | Limit or lift the session count |
 | `--skip-write` | Skip write rounds |
 | `--keep` | Keep shadow data for debugging (contains plaintext session copies) |
+| `--shadow-dir <dir>` / `--prefix-dir <dir>` | Choose the shadow home / candidate install directory; these are **never auto-cleaned** (the shadow home holds plaintext session copies) and `clean --yes` only removes the default artifacts directory |
 | `--allow-tools` | Explicitly allow executing recorded tool calls |
 
 Everything else is in `dsh-rehearsal --help`.
@@ -127,7 +128,7 @@ The write-round share is not migration coverage. Per-session coverage is in the 
 - The real home and desktop install directories are read-only; discovery and probing only parse files.
 - Credential-shaped environment variables are stripped, and telemetry is force-disabled.
 - Recorded tool calls do not execute by default (fail-closed read-only allowlist).
-- Reports are sanitized before being written, and shadow data is removed unless `--keep` is used.
+- Reports are sanitized before being written; shadow data is removed unless `--keep` or an explicit `--shadow-dir` is used, and externally chosen directories are not touched by `clean`.
 
 Exact guarantees, explicitly dangerous options, and what is out of scope: [SECURITY.en.md](SECURITY.en.md).
 

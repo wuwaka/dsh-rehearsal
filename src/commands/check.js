@@ -98,8 +98,15 @@ export async function cmdCheck(opts) {
     blocking: true,
     durationMs: ms(),
     details: `${noCandidate ? 'no --candidate given, newly-broken comparison NOT exercised; ' : ''}${pluginDetails.length} plugins analyzed against candidate=${opts.candidate ?? 'n/a'} current=${current ?? 'n/a'}; ${findings.length} findings (${blockingFindings.length} newly-broken high, ${preExisting.length} pre-existing)${current ? '' : '; current unknown: excluded-candidate plugins are classified high (re-run with --current)'}`,
-    evidence: evidence0.sources.length
-      ? [...findings, { currentRuntime: { version: evidence0.version, sources: evidence0.sources, ambiguous: evidence0.ambiguous ?? undefined } }]
+    evidence: evidence0.sources.length || evidence0.untrusted?.length
+      ? [...findings, {
+          currentRuntime: {
+            version: evidence0.version,
+            sources: evidence0.sources,
+            ambiguous: evidence0.ambiguous ?? undefined,
+            untrusted: evidence0.untrusted?.length ? evidence0.untrusted : undefined,
+          },
+        }]
       : findings,
   });
   if (noCandidate) {

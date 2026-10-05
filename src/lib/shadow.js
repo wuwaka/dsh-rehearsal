@@ -229,24 +229,28 @@ export function patchAdoptionGate(prefixDir, log = () => {}) {
   }
   // The pristine backup is bound to the installed candidate version: a
   // reused --prefix-dir across candidates would otherwise patch candidate B
-  // from candidate A's backup. A version change means installCandidate just
-  // rewrote the tree, so the live file IS pristine and re-seeding the backup
-  // from it is safe; an unchanged version keeps the existing backup (the
-  // live file may already be patched).
+  // from candidate A's backup. When the installed version cannot be read at
+  // all, do NOT guess which backup is valid — refuse the patch (review round
+  // 5, P2-4): preset sessions then skip with this reason, and the failure
+  // direction stays "no patch" rather than "patched from an unknown base".
   const backup = hl + '.rehearsal-orig';
   let candidateVersion = null;
   try {
     candidateVersion = JSON.parse(fs.readFileSync(path.join(prefixDir, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')).version ?? null;
-  } catch { /* version unknown: fall back to content-based re-seed below */ }
+  } catch { /* handled below */ }
+  if (!candidateVersion) {
+    log('adoption-gate patch skipped: candidate version unknown (cannot bind a pristine backup)');
+    return { ok: false, reason: 'candidate-version-unknown' };
+  }
   const stampFile = backup + '.candidate';
   let stamp = null;
   try { stamp = fs.readFileSync(stampFile, 'utf8').trim(); } catch { /* no stamp yet */ }
-  if (!fs.existsSync(backup) || (candidateVersion && stamp !== candidateVersion) || (!candidateVersion && !stamp)) {
-    if (fs.existsSync(backup) && candidateVersion && stamp !== candidateVersion) {
+  if (!fs.existsSync(backup) || stamp !== candidateVersion) {
+    if (fs.existsSync(backup)) {
       log(`adoption-gate backup re-seeded for candidate ${candidateVersion} (was ${stamp ?? 'unstamped'})`);
     }
     fs.copyFileSync(hl, backup);
-    fs.writeFileSync(stampFile, candidateVersion ?? 'unversioned');
+    fs.writeFileSync(stampFile, candidateVersion);
   }
   const original = fs.readFileSync(backup, 'utf8');
   const re = /(function currentPreset\([^)]*\)\s*\{)/;

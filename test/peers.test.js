@@ -92,6 +92,32 @@ test('P2-1: unknown current keeps conservative high classification', () => {
   assert.equal(f.find((x) => x.kind === 'peer-incompatible').severity, 'high');
 });
 
+test('non-string peer ranges are a visible finding, never silently unconstrained (round 5 P2-2)', () => {
+  for (const bad of [null, 123, { range: '^1.0.0' }]) {
+    const f = analyzePeerGraph(
+      [{ name: 'p', version: '1.0.0', peers: { '@deepseek-ai/dsh-agent': bad }, deps: {}, reproducible: true }],
+      { candidate: '0.2.0-rc.2', current: '0.2.0-rc.2' },
+    );
+    const hit = f.find((x) => x.kind === 'peer-range-unparseable');
+    assert.ok(hit, `${JSON.stringify(bad)} must produce a finding, not read as "no constraint"`);
+    assert.equal(hit.severity, 'warn');
+    assert.equal(f.filter((x) => x.severity === 'high').length, 0);
+  }
+  // a truly absent range is still unconstrained
+  const absent = analyzePeerGraph(
+    [{ name: 'p', version: '1.0.0', peers: {}, deps: {}, reproducible: true }],
+    { candidate: '0.2.0-rc.2' },
+  );
+  assert.equal(absent.filter((x) => x.kind === 'peer-range-unparseable').length, 0);
+  // plugin-to-plugin peers get the same treatment
+  const f2 = analyzePeerGraph([
+    { name: 'a', version: '1.0.0', peers: { b: null }, reproducible: true },
+    { name: 'b', version: '2.0.0', peers: {}, reproducible: true },
+  ], {});
+  assert.ok(f2.some((x) => x.kind === 'peer-range-unparseable'));
+  assert.equal(f2.filter((x) => x.severity === 'high').length, 0);
+});
+
 test('unparseable peer range is a visible warn finding, never silent compatibility (review P1-2)', () => {
   // measured 2026-10-05: semver.satisfies returns false (not throws) for
   // garbage ranges, so the pre-fix code classified this as a pre-existing

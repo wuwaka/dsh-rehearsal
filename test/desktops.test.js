@@ -16,6 +16,7 @@ import { DESKTOP_HOSTS, homeCandidates, bundleProbes } from '../src/lib/desktops
 import { looksLikeDshHome, resolveHome, runtimeEvidence } from '../src/lib/dshhome.js';
 import { readAsarFile } from '../src/lib/asar.js';
 import { homeShape } from '../src/lib/report.js';
+import { cmdCheck } from '../src/commands/check.js';
 import { cmdRun, desktopAmbiguityGate, desktopDataContext } from '../src/commands/run.js';
 
 const CLI = path.join(import.meta.dirname, '..', 'src', 'cli.js');
@@ -184,11 +185,16 @@ test('T2 looksLikeDshHome requires real harness data, not bare directories', (t)
   assert.equal(looksLikeDshHome(dir), false, 'profiles/node_modules is not a profile');
   fs.mkdirSync(path.join(dir, 'profiles', 'bare'), { recursive: true });
   assert.equal(looksLikeDshHome(dir), false, 'a profile dir without its package.json manifest does not count');
-  // an unrelated project manifest must not qualify: the harness writes a
-  // `dsh` field into every real profile manifest
+  // an unrelated project manifest must not qualify — the harness writes the
+  // composition structure (`dsh.profile.bundles`) into every real profile
+  // manifest, and nothing weaker is accepted (round 5, P2-5)
   fs.mkdirSync(path.join(dir, 'profiles', 'unrelated'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'profiles', 'unrelated', 'package.json'), JSON.stringify({ name: 'unrelated-project' }));
   assert.equal(looksLikeDshHome(dir), false, 'a manifest without the dsh field is not a harness profile');
+  fs.writeFileSync(path.join(dir, 'profiles', 'unrelated', 'package.json'), JSON.stringify({ name: 'some-project', dsh: {} }));
+  assert.equal(looksLikeDshHome(dir), false, 'an empty dsh object is not a harness profile');
+  fs.writeFileSync(path.join(dir, 'profiles', 'unrelated', 'package.json'), JSON.stringify({ name: 'some-project', dsh: { profile: {} } }));
+  assert.equal(looksLikeDshHome(dir), false, 'a dsh object without a bundles array is not a harness profile');
   fs.rmSync(path.join(dir, 'profiles', 'unrelated'), { recursive: true, force: true });
   makeProfile(dir);
   assert.equal(looksLikeDshHome(dir), true, 'profile manifest counts');
@@ -509,6 +515,29 @@ test('T7 without npm_config_prefix no global tree is discovered (documented cont
   const e = runtimeEvidence(path.join(dir, 'h'), null, undefined);
   assert.equal(e.version, null, 'a global install outside npm scripts is not probed: pass --current');
   assert.deepEqual(e.sources, []);
+});
+
+test('T7 untrusted markers reach the report evidence through check (round 5 P2-1)', async (t) => {
+  const dir = envSandbox(t);
+  await withWin32(dir, async () => {
+    makeProfile(path.join(dir, '.dsh'));
+    const desc = Buffer.from(JSON.stringify({
+      schemaVersion: 1,
+      release: { version: '1.0.0' },
+      sharedPackages: { '@deepseek-ai/dsh': { name: '@deepseek-ai/dsh', version: '1.0.0' } },
+    }));
+    installOfficial(dir, buildMiniAsar([{ path: 'dsh/desktop-runtime.json', data: desc }]));
+    const artifacts = path.join(dir, 'artifacts');
+    const { report } = await cmdCheck({ artifacts });
+    const b1 = report.stages.find((s) => s.id === 'b1-peer-graph');
+    const cr = b1.evidence.find((e) => e.currentRuntime);
+    assert.ok(cr, 'currentRuntime evidence must appear even with zero hits but an untrusted marker');
+    assert.equal(cr.currentRuntime.version, null);
+    assert.equal(cr.currentRuntime.untrusted.length, 1);
+    assert.equal(cr.currentRuntime.untrusted[0].host, 'deepseek-harness-desktop');
+    const raw = fs.readFileSync(path.join(artifacts, 'report.json'), 'utf8');
+    assert.ok(!raw.includes(dir), 'the sandbox path still never reaches the report');
+  });
 });
 
 // ---- T8: desktop scoping ----

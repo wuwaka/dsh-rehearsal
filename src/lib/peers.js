@@ -13,6 +13,22 @@
 import semver from 'semver';
 
 /**
+ * Classify a peer range value. `null` means the range is usable (or truly
+ * absent); a string explains why it is not.
+ *   undefined  → truly absent: no constraint (callers skip it)
+ *   ''/blank   → unconstrained, npm treats an empty range as `*`
+ *   string     → semver.validRange decides
+ *   anything else (null, number, object) → a manifest schema error, and must
+ *   NOT read as "no constraint" (review round 5, P2-2)
+ */
+function rangeInvalidKind(range) {
+  if (range === undefined) return null;
+  if (typeof range !== 'string') return `not a string (${typeof range})`;
+  if (!range.trim()) return null;
+  return semver.validRange(range) === null ? 'not valid semver' : null;
+}
+
+/**
  * @param {Array<{name, version, peers: object, deps: object, reproducible: boolean}>} plugins
  * @param {{candidate?: string, current?: string}} targets dsh runtime versions to test against
  */
@@ -26,19 +42,20 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
       //    breaks from what is already broken today (audit P2-1): reporting
       //    a pre-existing mismatch as a blocking upgrade verdict cries wolf.
       if (peer === '@deepseek-ai/dsh' || peer.startsWith('@deepseek-ai/dsh-')) {
-        // A range that cannot be parsed is a VISIBLE warn-level finding of
+        // A range that cannot be evaluated is a VISIBLE warn-level finding of
         // its own: classifying it through the satisfies() path would read
-        // "excluded by both current and candidate" — misleading wording for
-        // what is really "this range is unreadable". Never silent, never
-        // counted as compatible.
-        if (typeof range === 'string' && range.trim() && semver.validRange(range) === null) {
+        // "excluded by both versions" — misleading wording for what is really
+        // "this range is unreadable". Never silent, never counted as
+        // compatible, whether the problem is a bad string or a bad TYPE.
+        const invalid = rangeInvalidKind(range);
+        if (invalid) {
           findings.push({
             kind: 'peer-range-unparseable',
             severity: 'warn',
             plugin: p.name,
             peer,
             range,
-            note: 'peer range is not valid semver — incompatibility could not be evaluated; fix the range (or the plugin manifest) and re-run',
+            note: `peer range could not be evaluated (${invalid}) — incompatibility is unknown; fix the range (or the plugin manifest) and re-run`,
           });
           continue;
         }
@@ -93,14 +110,15 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
       } else if (byName.has(peer)) {
         // 2) plugin -> plugin peer inside the same profile
         const host = byName.get(peer);
-        if (typeof range === 'string' && range.trim() && semver.validRange(range) === null) {
+        const invalid = rangeInvalidKind(range);
+        if (invalid) {
           findings.push({
             kind: 'peer-range-unparseable',
             severity: 'warn',
             plugin: p.name,
             peer,
             range,
-            note: 'peer range is not valid semver — incompatibility could not be evaluated; fix the range (or the plugin manifest) and re-run',
+            note: `peer range could not be evaluated (${invalid}) — incompatibility is unknown; fix the range (or the plugin manifest) and re-run`,
           });
         } else if (host.version && !satisfiesPrerelease(host.version, range)) {
           findings.push({
@@ -201,7 +219,12 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
  * `peer-range-unparseable` finding in analyzePeerGraph.
  */
 export function satisfiesPrerelease(version, range) {
-  if (typeof range !== 'string' || !range.trim()) return true; // unconstrained
+  // Truly absent: no constraint. (analyzePeerGraph routes every malformed
+  // value — non-string or unparseable — to a finding BEFORE calling this;
+  // the returns below are the defensive backstop.)
+  if (range === undefined) return true;
+  if (typeof range !== 'string') return false; // malformed input never satisfies
+  if (!range.trim()) return true; // empty range = unconstrained (npm treats it as *)
   try {
     return semver.satisfies(version, range, { includePrerelease: false });
   } catch {

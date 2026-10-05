@@ -11,6 +11,13 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+### Fixed
+
+- Report redaction closes its last two gaps (review round 5, P1-1/P1-2): the home-path rules stopped at whitespace, so `C:\Users\John Smith\.dsh` leaked the surname and even an unspaced home kept everything after it (`~\AppData\Local\Temp\run-1` — both measured); home fields now consume to the field boundary with no tail (a clean home still normalises to `~`, a spaced field escalates to `<abs-path>`). And `writeReport()` is now fail-closed: when the invariant still finds path-shaped text it REFUSES to write (the earlier behaviour warned and wrote the leak anyway, contradicting the sanitised-before-disk promise).
+- Untrusted runtime markers reach the report (P2-1): a descriptor that exists but fails validation is listed under `currentRuntime.untrusted` in the `b1` evidence and `coverage.host.runtimeUntrusted`, so a null `current` explains itself.
+- Peer ranges that are not strings (`null`, numbers, objects) produce the `peer-range-unparseable` finding instead of reading as "no constraint" (P2-2); truly absent ranges (`undefined`, blank strings) stay unconstrained.
+- Hardening: `looksLikeDshHome` requires the `dsh.profile.bundles` array (P2-5); the adoption-gate patch refuses to run when the candidate version is unreadable rather than guessing which backup is valid (P2-4); README, `--help` and SECURITY spell out that `--shadow-dir` / `--prefix-dir` are never auto-cleaned and are not covered by `clean` (P2-3).
+
 ## [0.3.1] - 2026-10-05
 
 ### Fixed

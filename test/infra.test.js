@@ -119,4 +119,12 @@ test('P2-6: patchAdoptionGate re-seeds its backup when the candidate version cha
   assert.match(after, /candidate-two/, 'the patch base must be the freshly installed candidate');
   assert.match(after, /return void 0;/);
   assert.ok(!after.includes('candidate-one'), 'candidate A content must not survive into B');
+
+  // version unreadable: refuse to patch rather than guess which backup is valid
+  fs.rmSync(path.join(dshPkg, 'package.json'));
+  const before = fs.readFileSync(path.join(hl, 'index.js'), 'utf8');
+  const refused = patchAdoptionGate(dir);
+  assert.equal(refused.ok, false);
+  assert.equal(refused.reason, 'candidate-version-unknown');
+  assert.equal(fs.readFileSync(path.join(hl, 'index.js'), 'utf8'), before, 'the live file stays untouched');
 });

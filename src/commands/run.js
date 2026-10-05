@@ -50,6 +50,9 @@ export function desktopDataContext(origin, profileName, current, extra = {}) {
   };
   if (extra.currentAmbiguous) host.currentAmbiguous = extra.currentAmbiguous;
   if (extra.runtimeSources?.length) host.runtimeSources = extra.runtimeSources;
+  // markers that exist but failed validation: first-class provenance, so
+  // "current unknown" can explain WHY (review round 5, P2-1)
+  if (extra.runtimeUntrusted?.length) host.runtimeUntrusted = extra.runtimeUntrusted;
   if (!host.desktopScoped) return { scoped: false, host };
   const via = viaOrigin ? `the ${host.desktopApp} desktop home` : `the desktop-named profile "${profileName}"`;
   const runtime = current
@@ -168,6 +171,7 @@ export async function cmdRun(opts) {
   const dctx = desktopDataContext(resolved.origin, live?.name ?? null, current, {
     currentAmbiguous: evidence0.ambiguous ?? undefined,
     runtimeSources: evidence0.sources,
+    runtimeUntrusted: evidence0.untrusted,
   });
   if (dctx.scoped) report.warnings.push(dctx.warning);
   const nm = path.join(live.dir, 'node_modules');
@@ -190,8 +194,15 @@ export async function cmdRun(opts) {
     blocking: true,
     durationMs: ms(),
     details: `${pluginDetails.length} plugins vs ${opts.to} (current=${current ?? 'unknown'}); ${findings.length} findings (${blocking.length} newly-broken high, ${preExisting.length} pre-existing)${current ? '' : '; current unknown: excluded-candidate plugins are classified high (re-run with --current)'}`,
-    evidence: evidence0.sources.length
-      ? [...findings, { currentRuntime: { version: evidence0.version, sources: evidence0.sources, ambiguous: evidence0.ambiguous ?? undefined } }]
+    evidence: evidence0.sources.length || evidence0.untrusted?.length
+      ? [...findings, {
+          currentRuntime: {
+            version: evidence0.version,
+            sources: evidence0.sources,
+            ambiguous: evidence0.ambiguous ?? undefined,
+            untrusted: evidence0.untrusted?.length ? evidence0.untrusted : undefined,
+          },
+        }]
       : findings,
   });
 

@@ -113,8 +113,16 @@ const BOUND = '(^|[\\s=("\'`:;])';
 
 export function scrubText(s) {
   let out = String(s);
-  out = out.replace(/\b[A-Za-z]:[\\/]Users[\\/][^\\/\s"']+/g, '~');
-  out = out.replace(/\/(?:home|Users)\/[^/\s"']+/g, '~');
+  // Home rules consume to the END OF THE FIELD exactly like the general
+  // rules below. The old whitespace-bounded match orphaned the tail once the
+  // prefix became `~` (`C:\Users\John Smith\.dsh` -> `~ Smith\.dsh`;
+  // `C:\Users\Jane\AppData\Local\Temp\x` -> `~\AppData\Local\Temp\x` — both
+  // measured 2026-10-05) and the invariant cannot catch an orphaned tail
+  // that no longer looks absolute. An unambiguous home path still normalises
+  // to `~`; a field containing spaces is ambiguous, so it escalates to
+  // `<abs-path>` rather than risk keeping a fragment.
+  out = out.replace(new RegExp(`\\b[A-Za-z]:[\\\\/]Users[\\\\/]${FIELD}`, 'g'), (m) => (/\s/.test(m) ? '<abs-path>' : '~'));
+  out = out.replace(new RegExp(`\\/(?:home|Users)\\/${FIELD}`, 'g'), (m) => (/\s/.test(m) ? '<abs-path>' : '~'));
   // Paths may contain spaces ("My Docs", "Program Files"). Stopping the match
   // at whitespace redacted only the leading segments and LEAKED THE TAIL —
   // measured on a real machine: `D:\Work\a b\c.log` came out as
@@ -206,10 +214,9 @@ export function finalize(report) {
   if (report.target) report.target = scrubValue(report.target);
   if (Array.isArray(report.warnings)) report.warnings = report.warnings.map((w) => scrubText(w));
   // Invariant rather than a filter: the rules above know the shapes seen so far,
-  // and a later stage can compose one they do not. Surviving path-shaped text is
-  // surfaced as a warning instead of shipping silently — a redacted report that
-  // says it might not be fully redacted is honest, one that is silently wrong is
-  // the failure this tool exists to avoid.
+  // and a later stage can compose one they do not. Surviving path-shaped text
+  // marks the report unscrubbed; writeReport() then REFUSES to publish it —
+  // an invariant that only warns still ships the leak it detected.
   const scanned = JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k !== 'warnings')));
   const leftover = [...new Set(findPathShapes(scanned))];
   if (!report.privacy) report.privacy = {};
@@ -233,11 +240,20 @@ export function finalize(report) {
  * left a real gap — a report finalized once, then mutated by a later stage,
  * reached disk with the mutation unscrubbed and the flag still claiming
  * `true` (measured 2026-10-05: a path injected after finalize shipped
- * verbatim). finalize() is idempotent, so re-running costs a scan and closes
- * the gap for every caller, present and future.
+ * verbatim).
+ *
+ * Fail-closed (review round 5, P1-2): when the invariant still finds
+ * path-shaped text after scrubbing, the report is NOT written at all. The
+ * earlier behaviour warned and wrote anyway, which contradicted the promise
+ * that reports are sanitised before they reach disk — a warning next to
+ * leaked data is not a gate.
  */
 export function writeReport(dir, report) {
   const done = finalize(report);
+  if (done.privacy.scrubbed !== true) {
+    const gaps = (done.warnings ?? []).filter((w) => /redaction gap/.test(w)).length;
+    throw new Error(`refusing to write an unsanitised report (${gaps} redaction gap warning(s); the offending tokens are listed in the in-memory report only)`);
+  }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(done, null, 2));
   fs.writeFileSync(path.join(dir, 'report.md'), toMarkdown(done));
