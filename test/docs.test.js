@@ -128,8 +128,8 @@ const CITED_LINES = [
   ['src/commands/run.js', 21, /patch-entry-not-found/],
   ['src/commands/run.js', 22, /port-in-use/],
   ['src/commands/run.js', 23, /module-missing/],
-  ['src/commands/run.js', 245, /two cold boots/],
-  ['src/commands/run.js', 250, /MISSING_CREDENTIAL/],
+  ['src/commands/run.js', 250, /two cold boots/],
+  ['src/commands/run.js', 255, /MISSING_CREDENTIAL/],
 ];
 
 // Paths that live in somebody else's repository, each with a marker that must

@@ -91,3 +91,24 @@ test('P2-1: unknown current keeps conservative high classification', () => {
   const f = analyzePeerGraph(plugins, { candidate: '0.2.0-rc.2' });
   assert.equal(f.find((x) => x.kind === 'peer-incompatible').severity, 'high');
 });
+
+test('unparseable peer range is a visible warn finding, never silent compatibility (review P1-2)', () => {
+  // measured 2026-10-05: semver.satisfies returns false (not throws) for
+  // garbage ranges, so the pre-fix code classified this as a pre-existing
+  // mismatch. The dedicated finding says what is actually wrong.
+  const f = analyzePeerGraph(
+    [{ name: 'garbled', version: '1.0.0', peers: { '@deepseek-ai/dsh-agent': '>=0.2.0 ???' }, reproducible: true }],
+    { candidate: '0.2.0-rc.2', current: '0.2.0-rc.2' },
+  );
+  const hit = f.find((x) => x.kind === 'peer-range-unparseable');
+  assert.ok(hit, 'a garbage range must produce its own finding');
+  assert.equal(hit.severity, 'warn');
+  assert.equal(f.filter((x) => x.severity === 'high').length, 0, 'not misread as a confirmed incompatibility');
+  // plugin-to-plugin peers get the same treatment
+  const f2 = analyzePeerGraph([
+    { name: 'a', version: '1.0.0', peers: { b: 'not a range' }, reproducible: true },
+    { name: 'b', version: '2.0.0', peers: {}, reproducible: true },
+  ], {});
+  assert.ok(f2.some((x) => x.kind === 'peer-range-unparseable'));
+  assert.equal(f2.filter((x) => x.severity === 'high').length, 0);
+});

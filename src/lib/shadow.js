@@ -227,8 +227,27 @@ export function patchAdoptionGate(prefixDir, log = () => {}) {
     log('adoption-gate patch skipped: dsh-headless/lib/index.js not found');
     return { ok: false, reason: 'not-found' };
   }
+  // The pristine backup is bound to the installed candidate version: a
+  // reused --prefix-dir across candidates would otherwise patch candidate B
+  // from candidate A's backup. A version change means installCandidate just
+  // rewrote the tree, so the live file IS pristine and re-seeding the backup
+  // from it is safe; an unchanged version keeps the existing backup (the
+  // live file may already be patched).
   const backup = hl + '.rehearsal-orig';
-  if (!fs.existsSync(backup)) fs.copyFileSync(hl, backup);
+  let candidateVersion = null;
+  try {
+    candidateVersion = JSON.parse(fs.readFileSync(path.join(prefixDir, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8')).version ?? null;
+  } catch { /* version unknown: fall back to content-based re-seed below */ }
+  const stampFile = backup + '.candidate';
+  let stamp = null;
+  try { stamp = fs.readFileSync(stampFile, 'utf8').trim(); } catch { /* no stamp yet */ }
+  if (!fs.existsSync(backup) || (candidateVersion && stamp !== candidateVersion) || (!candidateVersion && !stamp)) {
+    if (fs.existsSync(backup) && candidateVersion && stamp !== candidateVersion) {
+      log(`adoption-gate backup re-seeded for candidate ${candidateVersion} (was ${stamp ?? 'unstamped'})`);
+    }
+    fs.copyFileSync(hl, backup);
+    fs.writeFileSync(stampFile, candidateVersion ?? 'unversioned');
+  }
   const original = fs.readFileSync(backup, 'utf8');
   const re = /(function currentPreset\([^)]*\)\s*\{)/;
   if (!re.test(original)) {

@@ -228,12 +228,16 @@ export function finalize(report) {
 /**
  * The only sanctioned way to put a report on disk.
  *
- * finalize() is idempotent, so calling it here costs nothing on the normal path
- * and closes the bypass on the unusual one: a stage that forgets to finalize
- * cannot write an unscrubbed report that still claims privacy.scrubbed=true.
+ * finalize() runs on EVERY write, unconditionally: `privacy.scrubbed` is the
+ * RESULT of the last scrub, not a permission token. Trusting it to skip work
+ * left a real gap — a report finalized once, then mutated by a later stage,
+ * reached disk with the mutation unscrubbed and the flag still claiming
+ * `true` (measured 2026-10-05: a path injected after finalize shipped
+ * verbatim). finalize() is idempotent, so re-running costs a scan and closes
+ * the gap for every caller, present and future.
  */
 export function writeReport(dir, report) {
-  const done = report?.privacy?.scrubbed === true ? report : finalize(report);
+  const done = finalize(report);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(done, null, 2));
   fs.writeFileSync(path.join(dir, 'report.md'), toMarkdown(done));

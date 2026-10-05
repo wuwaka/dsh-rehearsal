@@ -9,6 +9,15 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 桌面 bundle 探针的平台过滤失效：平台门读取的是不含该字段的对象，任何平台上都会探测全部宿主的安装路径（macOS 上会先试 Windows 路径）。现在按条目自身的平台过滤，并有"darwin 下不得泄漏 win32 路径"的回归测试。
+- 官方 macOS 探针多拼一层 `resources`（`Contents/Resources/resources/app.asar`），真实布局永远探不到，macOS 用户稳定得到 `current = null` 与保守高的噪音。探针改为按平台声明档位置（`archive`），含 darwin 命中与"双拼必须 miss"两组测试。
+- 官方回退探针（档内 `dsh/node_modules/@deepseek-ai/dsh/package.json`）是死代码：所有 asar 探针都被当描述符解析。探针新增 `kind`：描述符缺失时回退到档内 package.json；描述符存在但校验不过时保持未知并记入 `untrusted`——此处回退会绕过描述符的完整性交叉校验。
+- `writeReport()` 不再把 `privacy.scrubbed` 当跳过令牌：每次落盘都重新 `finalize()`。实测缺口：finalize 之后被追加的字段会原样入库，而脱敏标志仍声称干净。
+- 非法 peer 范围不再读作"两侧都不满足"的既有失配：新增 `peer-range-unparseable` 警告发现项说明真实原因；satisfies 包装的兜底分支返回 false 而不是 true。
+- `--home=`（空值）报可读错误，不再静默落到自动发现；home 门禁要求 profile manifest 带 harness 的 `dsh` 字段（无关项目的 package.json 不再算数）；`--prefix-dir` 跨 candidate 复用时 adoption-gate 备份按版本重播种；npm 前缀探测的契约（仅 `npm_config_prefix` 存在时生效）写进代码与测试。
+
 ## [0.3.0] - 2026-10-05
 
 ### 新增

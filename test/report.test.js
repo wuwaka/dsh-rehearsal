@@ -215,6 +215,22 @@ test('writeReport closes the bypass: an un-finalized report cannot reach disk cl
   assert.ok(!JSON.stringify(onDisk).includes('/root/'), 'and the path must be gone');
 });
 
+test('writeReport re-finalizes on every write: a report mutated AFTER finalize is scrubbed again (review P1-1)', (t) => {
+  const dir = fs.mkdtempSync(path_module.join(os.tmpdir(), 'dsh-write-refinalize-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const r = newReport({ candidateVersion: '0.2.0-rc.2', profile: 'web', command: 'run' });
+  finalize(r);
+  assert.equal(r.privacy.scrubbed, true);
+  // the realistic later-stage mutation: a stage appended after finalize ran.
+  // Measured pre-fix: the injected path shipped verbatim because
+  // privacy.scrubbed was trusted as a skip token.
+  r.stages.push({ id: 'x-late', verdict: 'pass', details: 'home=/root/.dsh and C:\\Users\\Jane\\x' });
+  writeReport(dir, r);
+  const raw = fs.readFileSync(path_module.join(dir, 'report.json'), 'utf8');
+  assert.ok(!raw.includes('/root/'), 'a post-finalize value must not reach disk unscrubbed');
+  assert.ok(!raw.includes('Jane'));
+});
+
 test('homeShape and defaultHome agree on what the default location is', async () => {
   const { defaultHome } = await import('../src/lib/dshhome.js');
   const d = defaultHome();

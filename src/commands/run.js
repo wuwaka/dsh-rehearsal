@@ -62,8 +62,8 @@ export function desktopDataContext(origin, profileName, current, extra = {}) {
 }
 
 /**
- * Pure-desktop ambiguity gate (plan §4.3): when no valid default home exists
- * and TWO OR MORE desktop homes validate, `run` refuses to choose an
+ * Pure-desktop ambiguity gate (v0.3.0 design): when no valid default home
+ * exists and TWO OR MORE desktop homes validate, `run` refuses to choose an
  * experiment target implicitly — `check` (read-only) proceeds with the
  * first and a warning. One validating candidate proceeds labelled.
  */
@@ -99,7 +99,12 @@ export async function cmdRun(opts) {
     console.log(`  [run] home resolved from host catalog: ${resolved.origin.slice('desktop:'.length)}`);
   }
   if (resolved.alternates.length) {
-    report.warnings.push(`multiple valid homes detected (selected ${resolved.origin}; also valid: ${resolved.alternates.join(', ')}) — pass --home to disambiguate`);
+    // N5: printed NOW, not only in the end-of-run summary — the pipeline
+    // installs ~500 packages before renderSummary() runs, and "also valid:
+    // …" arriving minutes later is useless for a decision this early.
+    const warn = `multiple valid homes detected (selected ${resolved.origin}; also valid: ${resolved.alternates.join(', ')}) — pass --home to disambiguate`;
+    report.warnings.push(warn);
+    console.log(`  [run] WARNING: ${warn}`);
   }
   let code = 3;
 

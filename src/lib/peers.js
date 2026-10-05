@@ -26,6 +26,22 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
       //    breaks from what is already broken today (audit P2-1): reporting
       //    a pre-existing mismatch as a blocking upgrade verdict cries wolf.
       if (peer === '@deepseek-ai/dsh' || peer.startsWith('@deepseek-ai/dsh-')) {
+        // A range that cannot be parsed is a VISIBLE warn-level finding of
+        // its own: classifying it through the satisfies() path would read
+        // "excluded by both current and candidate" — misleading wording for
+        // what is really "this range is unreadable". Never silent, never
+        // counted as compatible.
+        if (typeof range === 'string' && range.trim() && semver.validRange(range) === null) {
+          findings.push({
+            kind: 'peer-range-unparseable',
+            severity: 'warn',
+            plugin: p.name,
+            peer,
+            range,
+            note: 'peer range is not valid semver — incompatibility could not be evaluated; fix the range (or the plugin manifest) and re-run',
+          });
+          continue;
+        }
         const okC = candidate && semver.valid(candidate) ? satisfiesPrerelease(candidate, range) : null;
         const okCur = current && semver.valid(current) ? satisfiesPrerelease(current, range) : null;
         if (okC === false) {
@@ -77,7 +93,16 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
       } else if (byName.has(peer)) {
         // 2) plugin -> plugin peer inside the same profile
         const host = byName.get(peer);
-        if (host.version && !satisfiesPrerelease(host.version, range)) {
+        if (typeof range === 'string' && range.trim() && semver.validRange(range) === null) {
+          findings.push({
+            kind: 'peer-range-unparseable',
+            severity: 'warn',
+            plugin: p.name,
+            peer,
+            range,
+            note: 'peer range is not valid semver — incompatibility could not be evaluated; fix the range (or the plugin manifest) and re-run',
+          });
+        } else if (host.version && !satisfiesPrerelease(host.version, range)) {
           findings.push({
             kind: 'plugin-plugin-peer-incompatible',
             severity: 'high',
@@ -161,18 +186,25 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
 
 /**
  * semver.satisfies with explicit prerelease semantics: by default
- * satisfies() excludes prereleases unless the range opt-in via
+ * satisfies() excludes prereleases unless the range opts in via
  * [range, options]. We want standard npm semantics (a caret range over a
  * prerelease base does not match a higher-minor prerelease) — that is
  * exactly the footgun the reviews documented, so use the default strict
  * behavior: allow prerelease matches only when the range itself mentions a
  * prerelease of the same [major, minor, patch] tuple.
+ *
+ * Unparseable ranges: measured 2026-10-05, semver.satisfies() RETURNS FALSE
+ * for garbage ranges ('>=0.2.0 ???'), it does not throw. The catch is
+ * belt-and-braces for a future semver changing that, and it returns FALSE —
+ * "cannot prove it satisfies" must never masquerade as compatible. The
+ * visible signal for a garbage range is the dedicated
+ * `peer-range-unparseable` finding in analyzePeerGraph.
  */
 export function satisfiesPrerelease(version, range) {
   if (typeof range !== 'string' || !range.trim()) return true; // unconstrained
   try {
     return semver.satisfies(version, range, { includePrerelease: false });
   } catch {
-    return true; // unparseable range: do not report a false incompatibility
+    return false; // unparseable range must never masquerade as compatible
   }
 }

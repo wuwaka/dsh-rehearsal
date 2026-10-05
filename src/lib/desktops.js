@@ -35,26 +35,51 @@ export const DESKTOP_HOSTS = [
       // Windows: the whole dsh tree lives INSIDE resources/app.asar at dsh/
       // (apps/desktop/README.md:121,397); desktop-runtime.json carries
       // sharedPackages (an ARRAY — use .find) whose @deepseek-ai/dsh version
-      // upstream pins equal to release.version.
+      // upstream pins equal to release.version. `archive` is the app.asar
+      // path relative to installRoot (win32 layout: <root>\resources\app.asar).
       {
         platform: 'win32',
         install: { env: 'LOCALAPPDATA', segs: ['Programs', 'DeepSeek Harness'] },
+        archive: ['resources', 'app.asar'],
+        kind: 'descriptor',
         container: 'asar', file: 'dsh/desktop-runtime.json', note: 'measured-machine',
       },
       {
         platform: 'win32',
         install: { env: 'LOCALAPPDATA', segs: ['Programs', 'DeepSeek Harness'] },
+        archive: ['resources', 'app.asar'],
+        kind: 'package',
         container: 'asar', file: 'dsh/node_modules/@deepseek-ai/dsh/package.json', note: 'measured-source',
       },
       {
         platform: 'darwin',
         install: { env: null, segs: ['/Applications/DeepSeek Harness.app/Contents/Resources'] },
+        archive: ['app.asar'],
+        kind: 'descriptor',
         container: 'asar', file: 'dsh/desktop-runtime.json', note: 'inferred',
       },
       {
         platform: 'darwin',
         install: { env: 'HOME', segs: ['Applications', 'DeepSeek Harness.app', 'Contents', 'Resources'] },
+        archive: ['app.asar'],
+        kind: 'descriptor',
         container: 'asar', file: 'dsh/desktop-runtime.json', note: 'inferred',
+      },
+      // package.json fallbacks (used only when the descriptor is ABSENT, not
+      // when it exists but fails validation — see readDesktopBundleVersion)
+      {
+        platform: 'darwin',
+        install: { env: null, segs: ['/Applications/DeepSeek Harness.app/Contents/Resources'] },
+        archive: ['app.asar'],
+        kind: 'package',
+        container: 'asar', file: 'dsh/node_modules/@deepseek-ai/dsh/package.json', note: 'inferred',
+      },
+      {
+        platform: 'darwin',
+        install: { env: 'HOME', segs: ['Applications', 'DeepSeek Harness.app', 'Contents', 'Resources'] },
+        archive: ['app.asar'],
+        kind: 'package',
+        container: 'asar', file: 'dsh/node_modules/@deepseek-ai/dsh/package.json', note: 'inferred',
       },
       // Linux target is an AppImage (squashfs) — not readable externally,
       // deliberately uncatalogued and declared unsupported.
@@ -78,6 +103,7 @@ export const DESKTOP_HOSTS = [
         platform: 'win32',
         install: { env: 'LOCALAPPDATA', segs: ['Programs', 'DSH Desktop'] },
         container: 'plain',
+        kind: 'package',
         file: ['resources', 'app', 'node_modules', '@deepseek-ai', 'dsh', 'package.json'],
         note: 'measured-machine',
       },
@@ -85,6 +111,7 @@ export const DESKTOP_HOSTS = [
         platform: 'win32',
         install: { env: 'LOCALAPPDATA', segs: ['Programs', 'DSH Desktop Beta'] },
         container: 'plain',
+        kind: 'package',
         file: ['resources', 'app', 'node_modules', '@deepseek-ai', 'dsh', 'package.json'],
         note: 'inferred',
       },
@@ -92,6 +119,7 @@ export const DESKTOP_HOSTS = [
         platform: 'darwin',
         install: { env: null, segs: ['/Applications/DSH Desktop.app/Contents/Resources'] },
         container: 'plain',
+        kind: 'package',
         file: ['app', 'node_modules', '@deepseek-ai', 'dsh', 'package.json'],
         note: 'inferred',
       },
@@ -99,6 +127,7 @@ export const DESKTOP_HOSTS = [
         platform: 'darwin',
         install: { env: 'HOME', segs: ['Applications', 'DSH Desktop.app', 'Contents', 'Resources'] },
         container: 'plain',
+        kind: 'package',
         file: ['app', 'node_modules', '@deepseek-ai', 'dsh', 'package.json'],
         note: 'inferred',
       },
@@ -134,11 +163,11 @@ export function pathKey(p) {
   return process.platform === 'win32' ? r.toLowerCase() : r;
 }
 
-function resolveCandidate(cand) {
-  if (cand.platform && cand.platform !== process.platform) return null;
-  const base = cand.env ? process.env[cand.env] : null;
-  if (cand.env && !base) return null;
-  return cand.env ? path.join(base, ...cand.segs) : path.join(...cand.segs);
+/** Resolve one { env, segs } location; null when the env var is absent. */
+function resolvePath(loc) {
+  const base = loc.env ? process.env[loc.env] : null;
+  if (loc.env && !base) return null;
+  return loc.env ? path.join(base, ...loc.segs) : path.join(...loc.segs);
 }
 
 /** Resolved home candidates for one host, in catalog order, path-deduped. */
@@ -146,7 +175,8 @@ export function homeCandidates(host) {
   const seen = new Set();
   const out = [];
   for (const h of host.homes ?? []) {
-    const p = resolveCandidate(h);
+    if (h.platform && h.platform !== process.platform) continue;
+    const p = resolvePath(h);
     if (p === null) continue;
     const key = pathKey(p);
     if (seen.has(key)) continue;
@@ -156,13 +186,24 @@ export function homeCandidates(host) {
   return out;
 }
 
-/** Resolved bundle probes for one host, in catalog order. */
+/** Resolved bundle probes for one host, in catalog order, platform-filtered. */
 export function bundleProbes(host) {
   const out = [];
   for (const b of host.bundles ?? []) {
-    const root = resolveCandidate(b.install);
+    // the platform gate lives on the bundle entry itself, NOT on b.install —
+    // passing b.install here silently disabled the gate for every bundle
+    if (b.platform && b.platform !== process.platform) continue;
+    const root = resolvePath(b.install);
     if (root === null) continue;
-    out.push({ hostId: host.id, installRoot: root, container: b.container, file: b.file, note: b.note });
+    out.push({
+      hostId: host.id,
+      installRoot: root,
+      archive: b.archive ?? ['resources', 'app.asar'],
+      kind: b.kind ?? (b.container === 'asar' ? 'descriptor' : 'package'),
+      container: b.container,
+      file: b.file,
+      note: b.note,
+    });
   }
   return out;
 }

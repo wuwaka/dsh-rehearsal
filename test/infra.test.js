@@ -10,6 +10,7 @@ import path from 'node:path';
 import { countRows, simpleListAfter } from '../src/lib/yaml-lite.js';
 import { listProfiles, detectCurrentDshVersion } from '../src/lib/dshhome.js';
 import { shadowEnv, redactedEnvNames } from '../src/lib/util.js';
+import { patchAdoptionGate } from '../src/lib/shadow.js';
 
 const DESKTOP_LIKE = `- id: desktop-shell
   name: dsh-plugin-desktop
@@ -93,4 +94,29 @@ test('detectCurrentDshVersion prefers the profile-scoped install over machine pr
   assert.ok(asJunk === null || /^\d+\.\d+\.\d+/.test(asJunk), `non-semver leaked: ${asJunk}`);
 
   assert.equal(detectCurrentDshVersion(home, undefined), detectCurrentDshVersion(home, null), 'missing profile name must not throw');
+});
+
+test('P2-6: patchAdoptionGate re-seeds its backup when the candidate version changes', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dshr-gate-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const hl = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh-headless', 'lib');
+  fs.mkdirSync(hl, { recursive: true });
+  const dshPkg = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh');
+  fs.mkdirSync(dshPkg, { recursive: true });
+  const writeCandidate = (version, marker) => {
+    fs.writeFileSync(path.join(dshPkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version }));
+    fs.writeFileSync(path.join(hl, 'index.js'), `// ${marker}\nfunction currentPreset(ctx) { return ctx; }\n`);
+  };
+  writeCandidate('1.0.0', 'candidate-one');
+  assert.equal(patchAdoptionGate(dir).ok, true);
+  assert.match(fs.readFileSync(path.join(hl, 'index.js'), 'utf8'), /candidate-one/);
+
+  // a reused --prefix-dir gets candidate B installed over candidate A: the
+  // patch must be derived from B, not from A's stale backup
+  writeCandidate('2.0.0', 'candidate-two');
+  assert.equal(patchAdoptionGate(dir).ok, true);
+  const after = fs.readFileSync(path.join(hl, 'index.js'), 'utf8');
+  assert.match(after, /candidate-two/, 'the patch base must be the freshly installed candidate');
+  assert.match(after, /return void 0;/);
+  assert.ok(!after.includes('candidate-one'), 'candidate A content must not survive into B');
 });

@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import semver from 'semver';
 import { countRows, simpleListAfter } from './yaml-lite.js';
 import { readAsarFile } from './asar.js';
 import { allHomeCandidates, bundleProbes, DESKTOP_HOSTS, pathKey } from './desktops.js';
@@ -42,9 +43,12 @@ function expandTilde(p) {
  * Structural check for "this directory is a DSH_HOME" — the acceptance gate
  * for catalog-discovered homes, so an inferred path can only ever degrade
  * into "not found", never into rehearsing the wrong target. A home counts
- * when it holds REAL harness data: a profile with its package.json manifest,
- * or a session generation file under sessions/<ws>/<id>/ (bare directories
- * do not qualify).
+ * when it holds REAL harness data:
+ *   - a profile whose manifest carries the harness `dsh` field (what the
+ *     harness writes into profiles/<name>/package.json; a random sibling
+ *     project named profiles/foo/package.json does not qualify), or
+ *   - a session generation file under sessions/<ws>/<id>/ (bare directories
+ *     do not qualify).
  */
 export function looksLikeDshHome(dir) {
   try {
@@ -52,7 +56,10 @@ export function looksLikeDshHome(dir) {
     if (fs.existsSync(profilesDir)) {
       for (const e of fs.readdirSync(profilesDir, { withFileTypes: true })) {
         if (!e.isDirectory() || e.name === 'node_modules' || e.name.startsWith('.')) continue;
-        if (fs.existsSync(path.join(profilesDir, e.name, 'package.json'))) return true;
+        try {
+          const pkg = JSON.parse(fs.readFileSync(path.join(profilesDir, e.name, 'package.json'), 'utf8'));
+          if (pkg && typeof pkg === 'object' && pkg.dsh && typeof pkg.dsh === 'object') return true;
+        } catch { /* no or unreadable manifest: keep looking */ }
       }
     }
     const sessionsDir = path.join(dir, 'sessions');
@@ -84,17 +91,23 @@ export function looksLikeDshHome(dir) {
  *      `desktop:<id>`; multiple valid candidates surface as `alternates`
  *   5. fallback: the default home path (downstream reports "no usable
  *      profile" honestly, unchanged from before)
- * A non-string --home (bare `--home` from parseArgs) fails with a readable
- * error instead of a path.join TypeError. Selection itself never auto-picks
- * between several desktop homes: `run` gates on that (see
+ * A non-string --home (bare `--home` from parseArgs) and an explicitly
+ * blank --home both fail with a readable error instead of a path.join
+ * TypeError or a silent fall-through to auto-discovery. Selection itself
+ * never auto-picks between several desktop homes: `run` gates on that (see
  * desktopAmbiguityGate), `check` takes the first with a warning.
  */
 export function resolveHome(explicitHome) {
   if (explicitHome !== undefined && explicitHome !== null && typeof explicitHome !== 'string') {
     throw new Error(`--home must be a path string, got ${typeof explicitHome}`);
   }
-  if (typeof explicitHome === 'string' && explicitHome.trim()) {
-    return { home: path.resolve(expandTilde(explicitHome.trim())), origin: 'flag', alternates: [], desktopCandidates: 0 };
+  if (typeof explicitHome === 'string') {
+    const trimmed = explicitHome.trim();
+    // An explicit-but-blank --home is a mistake, not "unset": silently
+    // falling through would run the rehearsal against an auto-discovered
+    // home while the user believes they chose one.
+    if (!trimmed) throw new Error('--home must not be empty');
+    return { home: path.resolve(expandTilde(trimmed)), origin: 'flag', alternates: [], desktopCandidates: 0 };
   }
   const env = process.env.DSH_HOME;
   if (typeof env === 'string' && env.trim()) {
@@ -142,10 +155,13 @@ export function listProfiles(home) {
  * (audit P2-1): needed to classify peer findings as pre-existing vs newly
  * broken by the candidate. Probe chain:
  *   1. the profile's node_modules (mirrors the dsh installation closure)
- *   2. the npm-global-style profiles/node_modules beside the profiles
+ *   2. profiles/node_modules beside the profiles (pnpm's shared closure)
  *   3. desktop bundles from the host catalog — a `desktop:<id>` home origin
  *      only trusts its own host; other origins probe all hosts
- *   4. the npm global install beside the PATH dsh shim
+ *   4. the npm prefix, but ONLY when `npm_config_prefix` is present in the
+ *      environment (npm sets it while running scripts). A plain global
+ *      install outside npm does not set it and is not discovered — pass
+ *      `--current` in that case.
  * Returns null when undetectable — callers must treat that as "unknown",
  * never as "matches candidate". Callers wanting provenance and the
  * multi-host conflict verdict use runtimeEvidence() instead.
@@ -156,14 +172,17 @@ export function detectCurrentDshVersion(home, profileName, origin) {
 
 /**
  * Same probe chain as detectCurrentDshVersion with provenance: every hit
- * carries { host, version, source }. When desktop hosts DISAGREE on their
- * bundled runtime (two hosts installed, one shared home), "current" is
- * genuinely unknowable: version is null and `ambiguous` lists the
+ * carries { host, version, source }, and markers that exist but fail
+ * validation are listed in `untrusted` instead of being silently dropped.
+ * When desktop hosts DISAGREE on their bundled runtime (two hosts installed,
+ * one shared home — including hosts installed but never launched), "current"
+ * is genuinely unknowable: version is null and `ambiguous` lists the
  * contenders — peers.js then classifies excluded-candidate plugins as high,
  * and the report states that consequence explicitly.
  */
 export function runtimeEvidence(home, profileName, origin) {
   const sources = [];
+  const untrusted = [];
   const push = (host, version, source) => { if (version) sources.push({ host, version, source }); };
 
   const pkgCandidates = [
@@ -177,7 +196,7 @@ export function runtimeEvidence(home, profileName, origin) {
         // tier 1 is AUTHORITATIVE for the home: the profile's own closure is
         // the runtime that wrote these sessions, so a machine-level desktop
         // bundle never competes with it (old first-hit behavior preserved)
-        return { version: v, sources: [{ host: 'profile-node_modules', version: v, source: 'profile-node_modules' }], ambiguous: null };
+        return { version: v, sources: [{ host: 'profile-node_modules', version: v, source: 'profile-node_modules' }], ambiguous: null, untrusted: [] };
       }
     } catch { /* next probe */ }
   }
@@ -185,25 +204,47 @@ export function runtimeEvidence(home, profileName, origin) {
   const scopedId = typeof origin === 'string' && origin.startsWith(DESKTOP_ORIGIN_PREFIX)
     ? origin.slice(DESKTOP_ORIGIN_PREFIX.length)
     : null;
+  // Group probes by (host, installRoot) so the package.json fallback applies
+  // per INSTALL LOCATION, and only when that location's descriptor is
+  // ABSENT: a descriptor that exists but fails validation (schema drift,
+  // version mismatch) is untrusted, and falling back would bypass the
+  // integrity cross-check the descriptor exists for.
+  const groups = [];
+  const groupIndex = new Map();
   for (const host of DESKTOP_HOSTS) {
     if (scopedId && host.id !== scopedId) continue;
     for (const probe of bundleProbes(host)) {
-      const v = readDesktopBundleVersion(probe);
-      if (v) push(host.id, v, probe.container === 'asar' ? 'desktop-runtime.json' : 'package.json');
+      const key = `${probe.hostId}\u0000${probe.installRoot}`;
+      let g = groupIndex.get(key);
+      if (!g) { g = { hostId: probe.hostId, probes: [] }; groupIndex.set(key, g); groups.push(g); }
+      g.probes.push(probe);
+    }
+  }
+  for (const g of groups) {
+    const descriptor = g.probes.find((p) => p.kind === 'descriptor');
+    const pkg = g.probes.find((p) => p.kind === 'package');
+    const record = (r) => {
+      if (r.status === 'hit') push(g.hostId, r.version, r.source);
+      else if (r.status === 'untrusted') untrusted.push({ host: g.hostId, source: r.source ?? (descriptor ? 'desktop-runtime.json' : 'package.json') });
+    };
+    if (descriptor) {
+      const r = readDesktopBundleVersion(descriptor);
+      if (r.status === 'hit' || r.status === 'untrusted') record(r);
+      else if (pkg) record(readDesktopBundleVersion(pkg)); // descriptor absent → fallback
+    } else if (pkg) {
+      record(readDesktopBundleVersion(pkg));
     }
   }
   if (sources.length) {
     const versions = new Set(sources.map((s) => s.version));
-    if (versions.size === 1) return { version: sources[0].version, sources, ambiguous: null };
-    return { version: null, sources, ambiguous: sources.map((s) => ({ host: s.host, version: s.version })) };
+    if (versions.size === 1) return { version: sources[0].version, sources, ambiguous: null, untrusted };
+    return { version: null, sources, ambiguous: sources.map((s) => ({ host: s.host, version: s.version })), untrusted };
   }
 
-  // npm prefix is a FALLBACK only: the old first-hit chain never let the
-  // PATH shim's version compete with profile/desktop evidence, and under
-  // `npm test` the injected npm_config_prefix makes this probe hit a real
-  // global dsh that may predate the profile's runtime — a fallback keeps
-  // that from manufacturing false ambiguity.
-  if (!sources.length && process.env.npm_config_prefix) {
+  // npm prefix is a FALLBACK only, and only when npm_config_prefix is
+  // present (npm sets it for its own child processes): the probe reads that
+  // variable rather than discovering a global install on its own.
+  if (process.env.npm_config_prefix) {
     try {
       const v = JSON.parse(
         fs.readFileSync(path.join(process.env.npm_config_prefix, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), 'utf8'),
@@ -211,42 +252,60 @@ export function runtimeEvidence(home, profileName, origin) {
       if (v && semverLike(v)) push('npm-prefix', v, 'npm-prefix');
     } catch { /* absent */ }
   }
-
-  if (!sources.length) return { version: null, sources, ambiguous: null };
-  const versions = new Set(sources.map((s) => s.version));
-  if (versions.size === 1) return { version: sources[0].version, sources, ambiguous: null };
-  return { version: null, sources, ambiguous: sources.map((s) => ({ host: s.host, version: s.version })) };
+  if (!sources.length) return { version: null, sources, ambiguous: null, untrusted };
+  return { version: sources[0].version, sources, ambiguous: null, untrusted };
 }
 
 /**
- * Version from one catalog bundle probe. asar containers read the official
- * desktop-runtime.json (schemaVersion 1; sharedPackages is an ARRAY — use
- * find; upstream pins @deepseek-ai/dsh's version equal to release.version,
- * so a mismatch means a descriptor we do not know how to trust → null).
- * plain containers read a package.json version. Anything else → null.
+ * Read one catalog bundle probe. Returns
+ *   { status: 'hit', version, source } — a usable runtime version
+ *   { status: 'miss' }                 — the marker file is not there
+ *   { status: 'untrusted' }            — the marker exists but fails validation
+ * asar descriptor probes parse desktop-runtime.json (schemaVersion 1;
+ * `sharedPackages` is an ARRAY — use find; upstream pins the @deepseek-ai/dsh
+ * version equal to release.version, so a mismatch is untrusted, never
+ * fallback-worthy). asar/plain package probes parse a package.json version.
+ * The `archive` segments locate app.asar relative to installRoot — the win32
+ * layout is <root>\resources\app.asar while macOS installs keep the archive
+ * directly at <root>/app.asar under .../Contents/Resources.
  */
 function readDesktopBundleVersion(probe) {
   try {
     if (probe.container === 'asar') {
-      const raw = readAsarFile(path.join(probe.installRoot, 'resources', 'app.asar'), probe.file);
-      if (!raw) return null;
-      const j = JSON.parse(raw.toString('utf8'));
-      if (!j || j.schemaVersion !== 1 || !Array.isArray(j.sharedPackages)) return null;
+      const raw = readAsarFile(path.join(probe.installRoot, ...(probe.archive ?? ['resources', 'app.asar'])), probe.file);
+      if (!raw) return { status: 'miss' };
+      let j;
+      try { j = JSON.parse(raw.toString('utf8')); } catch { return { status: 'untrusted' }; }
+      const source = probe.kind === 'package' ? 'package.json' : 'desktop-runtime.json';
+      if (probe.kind === 'package') {
+        const v = j && typeof j === 'object' ? j.version : null;
+        return isValidVersion(v) ? { status: 'hit', version: v, source } : { status: 'untrusted' };
+      }
+      if (!j || j.schemaVersion !== 1 || !Array.isArray(j.sharedPackages)) return { status: 'untrusted' };
       const entry = j.sharedPackages.find((e) => e && e.name === '@deepseek-ai/dsh');
       const v = entry && typeof entry.version === 'string' ? entry.version : null;
-      if (!v || !semverLike(v) || j.release?.version !== v) return null;
-      return v;
+      if (!isValidVersion(v) || j.release?.version !== v) return { status: 'untrusted' };
+      return { status: 'hit', version: v, source };
     }
     const pjPath = path.join(probe.installRoot, ...(Array.isArray(probe.file) ? probe.file : [probe.file]));
-    const v = JSON.parse(fs.readFileSync(pjPath, 'utf8')).version;
-    return typeof v === 'string' && semverLike(v) ? v : null;
+    let v;
+    try {
+      v = JSON.parse(fs.readFileSync(pjPath, 'utf8')).version;
+    } catch (e) {
+      return e?.code === 'ENOENT' ? { status: 'miss' } : { status: 'untrusted' };
+    }
+    return isValidVersion(v) ? { status: 'hit', version: v, source: 'package.json' } : { status: 'untrusted' };
   } catch {
-    return null;
+    return { status: 'untrusted' };
   }
 }
 
+function isValidVersion(v) {
+  return typeof v === 'string' && semver.valid(v) !== null;
+}
+
 function semverLike(v) {
-  return /^\d+\.\d+\.\d+/.test(String(v));
+  return isValidVersion(v);
 }
 
 /**

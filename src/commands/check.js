@@ -47,7 +47,7 @@ export async function cmdCheck(opts) {
     durationMs: ms(),
     details: live
       ? `home=${homeShape(home, defaultHome(), resolved.origin)}; profiles=[${names.join(', ')}]; live=${live.name} (bundles=${live.stats.bundleCount}, patchRows=${live.stats.patchRowCount}, plugins=${live.stats.pluginCount}, ${live.plugins.filter((p) => !p.reproducible).length} non-reproducible); sessions=${sessions.length} (genDist=${JSON.stringify(genDist)}, presets=${JSON.stringify(presetDist)}); settings=${readSettingsShape(home).kind}`
-      : `no usable profile found under the given DSH_HOME (home=${homeShape(home, defaultHome())})`,
+      : `no usable profile found under the given DSH_HOME (home=${homeShape(home, defaultHome(), resolved.origin)})`,
     evidence: live
       ? [
           { live: live.name, ranked: profiles.filter((p) => p.exists).map((p) => ({ name: p.name, ...p.stats })), patchLayers: live.patchLayers, workspace: live.workspace ?? null, marketFacts: readMarketFacts(home, live.name) },

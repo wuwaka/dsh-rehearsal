@@ -40,7 +40,7 @@ Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse 
 Two structural guarantees rather than more regexes:
 
 - **shapes instead of paths**. Fields such as DSH_HOME record a shape or an origin (`home=default|custom|desktop:<host-id>|unknown`), so no path ever enters the string.
-- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. A future stage that composes a new path shape therefore lands in the report as a `redaction gap` warning instead of passing silently. `writeReport()` is the only writer, and it finalizes an un-finalized report on the way to disk.
+- **survivors are reported, not shipped**. `finalize()` re-scans the whole report with the same shape detector and writes any unmasked path-shaped text into `warnings[]` (`redaction gap: …`), and sets `privacy.scrubbed` from that result rather than asserting it at construction. `writeReport()` is the only writer, and it re-runs `finalize()` on EVERY write: `scrubbed` is a result, not a skip token, so a field appended after a previous finalize is scrubbed too. A future stage that composes a new path shape therefore lands in the report as a `redaction gap` warning instead of passing silently.
 
 This remains best-effort filtering, not a proof.
 

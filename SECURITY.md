@@ -40,7 +40,7 @@
 两道结构性保障，而不是继续加正则：
 
 - **能不写路径就不写**。DSH_HOME 这类字段只写形状或来源（`home=default|custom|desktop:<host-id>|unknown`），路径根本不进入字符串。
-- **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它会就地补做未执行的 `finalize()`。于是将来某个新阶段拼出未覆盖的路径形状时，报告会带着 `redaction gap` 警告落盘，而不是无声通过。
+- **漏网即报警**。`finalize()` 用同一套形状检测器扫一遍完整报告，任何未被遮住的 path-shaped 文本都会写入 `warnings[]`（`redaction gap: …`），并由该结果决定 `privacy.scrubbed` 的取值——这个字段不再在构造时宣称。落盘只允许经过 `writeReport()`，它每次落盘都重新 `finalize()`：`scrubbed` 是结果，不是跳过检查的令牌，finalize 之后被追加的字段同样会被清理。于是将来某个新阶段拼出未覆盖的路径形状时，报告会带着 `redaction gap` 警告落盘，而不是无声通过。
 
 仍要说清的是：这依然是尽力而为的过滤，不是证明。
 

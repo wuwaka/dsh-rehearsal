@@ -37,13 +37,13 @@
 | `port-in-use` | `EADDRINUSE` | `src/commands/run.js:22` | 端口占用，属环境问题，不构成兼容性结论 | 本工具判据 | 是 |
 | `module-missing` | `Cannot find module` | `src/commands/run.js:23` | 候选安装不完整，或原生模块缺失（默认 `--ignore-scripts` 时更需留意） | 本工具判据 | 是，可构造 |
 
-`#1294` 中还记录了第二类形态。它不作为签名，而是流程设计依据：插件批量升级后的首次冷启动出现 renderer 30 秒健康上报超时，相同配置第二次启动即正常。因此 `run` 固定执行两次冷启动（`src/commands/run.js:245`）——一次失败一次成功记为抖动，不记为不兼容。
+`#1294` 中还记录了第二类形态。它不作为签名，而是流程设计依据：插件批量升级后的首次冷启动出现 renderer 30 秒健康上报超时，相同配置第二次启动即正常。因此 `run` 固定执行两次冷启动（`src/commands/run.js:250`）——一次失败一次成功记为抖动，不记为不兼容。
 
 ## 三、不表示失败的形态
 
 | 形态 | 出现位置 | 正确读法 |
 |---|---|---|
-| `MISSING_CREDENTIAL` | 冷启动（`src/commands/run.js:250,275`）；写回合（`src/lib/drill.js:325`） | 启动阶段：通过判据，说明进程存活至模型调用边界，无键运行本就应停在此处。写回合阶段：表示未被演练——replay 未拦截 provider 路由，写路径未完整执行，判 `inconclusive`，不判 `pass` |
+| `MISSING_CREDENTIAL` | 冷启动（`src/commands/run.js:255,280`）；写回合（`src/lib/drill.js:325`） | 启动阶段：通过判据，说明进程存活至模型调用边界，无键运行本就应停在此处。写回合阶段：表示未被演练——replay 未拦截 provider 路由，写路径未完整执行，判 `inconclusive`，不判 `pass` |
 | `no adapter registered`、`llm-replay:` | `src/lib/drill.js:325` | replay 挂载未生效，判 `inconclusive` |
 | 工具结果行含 `not registered`、`unknown tool`、`not found` | `src/lib/drill.js:217-226`，计入 `unknownToolish` | 预期产物：写回合默认抑制全部工具提供方（`src/lib/shadow.js` 中 `writeReplayPatch` 的 `suppressToolRows`），被重放的调用只应返回该错误。不构成兼容性信号 |
 | 工具结果行含 `"isError":true` | 同上，计入 `errorFlagged` | 历史中原本即报错的行，与本次升级无关 |

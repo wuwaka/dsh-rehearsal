@@ -1,11 +1,12 @@
 // Read-only ASAR archive access for desktop runtime probing.
 //
-// Format (validated against a real official package on 2026-10-05, see
-// DESKTOP-COMPAT-PLAN.md §4.2): an 8-byte size pickle (uint32 = 4, then
-// uint32 = header pickle bytes), the header pickle (uint32 payload size,
-// uint32 string length, then the JSON file table), and file data starting at
-// 8 + headerPickleBytes. Each entry carries `size`, a decimal-string
-// `offset`, and optional `unpacked` / `link` markers.
+// Format (validated against a real official package on 2026-10-05: the
+// 0.2.0-rc.2 win-x64 install, 121,348,951 B archive with a 3,392,064 B
+// header): an 8-byte size pickle (uint32 = 4, then uint32 = header pickle
+// bytes), the header pickle (uint32 payload size, uint32 string length,
+// then the JSON file table), and file data starting at 8 +
+// headerPickleBytes. Each entry carries `size`, a decimal-string `offset`,
+// and optional `unpacked` / `link` markers.
 //
 // Safety posture: READ-ONLY via openSync/readSync with partial reads (the
 // official app.asar is ~121 MB with a ~3.2 MB header — never read it whole);

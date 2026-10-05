@@ -11,6 +11,15 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+### Fixed
+
+- Desktop bundle probes were not platform-filtered: the gate read a `platform` field off an object that does not carry one, so every platform probed every host's install paths (on macOS the Windows paths would be attempted first). The gate now filters catalog entries themselves, with a regression test that fails if win32 roots leak under a darwin platform.
+- The official macOS probe joined an extra `resources` segment (`Contents/Resources/resources/app.asar`) and could never hit the real `Contents/Resources/app.asar` layout, leaving macOS users with `current = null` and conservative-high noise. Probe entries now declare their archive segments per platform, with darwin hit and doubled-path miss tests.
+- The official fallback probe (`dsh/node_modules/@deepseek-ai/dsh/package.json` inside the archive) was dead code: every asar probe was parsed as a descriptor. Probes now declare a `kind`: a missing descriptor falls back to the in-archive package.json, while a descriptor that exists but fails validation stays unknown and is listed under `untrusted` — falling back there would bypass the descriptor's integrity cross-check.
+- `writeReport()` no longer treats `privacy.scrubbed` as a skip token: it re-runs `finalize()` on every write. Measured gap: a field appended after a previous finalize reached disk unscrubbed while the flag still claimed clean.
+- Unparseable peer ranges no longer read as a settled "excluded by both versions": a dedicated `peer-range-unparseable` warn finding says what is actually wrong, and the satisfies wrapper returns false on its belt-and-braces path instead of true.
+- `--home=` (blank) now fails with a readable error instead of silently falling through to auto-discovery; the home gate requires the harness `dsh` field in a profile manifest (an unrelated project's `package.json` no longer qualifies); the adoption-gate backup re-seeds when a reused `--prefix-dir` gets a different candidate version; the npm-prefix probe's contract (only when `npm_config_prefix` is present) is stated in code and tests.
+
 ## [0.3.0] - 2026-10-05
 
 ### Added

@@ -41,14 +41,14 @@ One string, `MISSING_CREDENTIAL`, means opposite things in two stages (see secti
 `#1294` also documents a second failure shape. It is not a signature but the basis for a flow
 decision: after a batch plugin upgrade the first cold boot hit a 30-second renderer health-report
 timeout, while an identical configuration booted normally on the second attempt. `run` therefore
-always performs two cold boots (`src/commands/run.js:245`): one failing and one succeeding is
+always performs two cold boots (`src/commands/run.js:250`): one failing and one succeeding is
 recorded as jitter, not as incompatibility.
 
 ## 3. Shapes that do not indicate failure
 
 | Shape | Where | Correct reading |
 |---|---|---|
-| `MISSING_CREDENTIAL` | cold boot (`src/commands/run.js:250,275`); write round (`src/lib/drill.js:325`) | During boot it is the pass criterion: the process lived to the model-call boundary, which is where a keyless run should stop. During a write round it means not exercised: replay did not intercept the provider route, the write path was not fully traversed, so the verdict is `inconclusive`, never `pass` |
+| `MISSING_CREDENTIAL` | cold boot (`src/commands/run.js:255,280`); write round (`src/lib/drill.js:325`) | During boot it is the pass criterion: the process lived to the model-call boundary, which is where a keyless run should stop. During a write round it means not exercised: replay did not intercept the provider route, the write path was not fully traversed, so the verdict is `inconclusive`, never `pass` |
 | `no adapter registered`, `llm-replay:` | `src/lib/drill.js:325` | The replay mount did not take effect; `inconclusive` |
 | Tool result rows containing `not registered`, `unknown tool`, `not found` | `src/lib/drill.js:217-226`, counted as `unknownToolish` | Expected artifact: the write round suppresses all tool providers by default (`suppressToolRows` in `writeReplayPatch`, `src/lib/shadow.js`), so a replayed call should only return this error. Not a compatibility signal |
 | Tool result rows containing `"isError":true` | same site, counted as `errorFlagged` | Rows that already errored in the recording; unrelated to this upgrade |

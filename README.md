@@ -138,7 +138,10 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 | Node.js | `>=22.19`（需 `node:zlib` 的 zstd） |
 | `run` | Tested：Windows 真机会话 |
 | `check` | Tested：Windows；CI：macOS / Linux / Windows |
-| Desktop 托管 profile | 会话迁移演练 Tested（官方与社区桌面 home 自动发现）；桌面内置运行时 Not tested（预演对象为 npm 候选，报告带范围警告） |
+| Desktop 托管 profile（会话迁移演练） | Tested：社区桌面托管数据，Windows（2026-10-02） |
+| Desktop home 自动发现 | Windows：官方默认安装与社区 bundle 实测；macOS / Linux：Inferred（按上游布局），未在真机验证 |
+| 桌面内置运行时探测 | 官方 Windows 默认安装实测（asar 描述文件）；自定义安装目录与 Linux AppImage：Not covered |
+| 桌面内置运行时作为预演对象 | Not tested（预演对象是 npm 候选，报告带范围警告） |
 | 候选来源 | npm / 自托管的 `web`、`headless` profile |
 | 运行时依赖 | `semver` |
 
@@ -147,6 +150,10 @@ Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代
 ## 限制
 
 - `run` 预演的是自装 npm 候选，不是桌面应用内置运行时：对桌面托管的 home，判定覆盖 npm 依赖闭包与会话数据格式，桌面应用自身的更新通道不在预演范围内（警告与报告中的 `coverage.host` 字段写明这一范围）。
+- 桌面探测只覆盖默认安装位置：官方与社区桌面的安装器都允许自选目录，自定义安装的宿主探测不到内置运行时版本，用 `--current` 手工指定。
+- macOS 的官方/社区桌面路径按上游布局推断，未在真机验证；Linux 官方桌面是 AppImage，外部不可读，明确不支持。
+- 经 anywhere-labs Recovery 自选数据目录、或 `DSH_DATA_ROOT` / 便携版 `DSH_HOME` 重定向过的桌面 home 不在自动发现范围内，用 `--home` 指定。
+- 同机多个桌面宿主的内置运行时版本不一致时 `current` 判为未知（报告列 `currentAmbiguous`），用 `--current` 指定，或卸载闲置宿主；判定方向刻意保守。
 - 写回合覆盖窄于迁移覆盖，见[覆盖范围](#覆盖范围)。
 - 带 `agentPreset` 的会话只做格式级验证，预设组合不重建。
 - 附件旁路数据（`~/.dsh/attachments` 等）不复制、不校验。

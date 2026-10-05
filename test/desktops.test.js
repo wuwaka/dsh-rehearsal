@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { DESKTOP_HOSTS, homeCandidates } from '../src/lib/desktops.js';
+import { DESKTOP_HOSTS, homeCandidates, bundleProbes } from '../src/lib/desktops.js';
 import { looksLikeDshHome, resolveHome, runtimeEvidence } from '../src/lib/dshhome.js';
 import { readAsarFile } from '../src/lib/asar.js';
 import { homeShape } from '../src/lib/report.js';
@@ -20,7 +20,33 @@ import { cmdRun, desktopAmbiguityGate, desktopDataContext } from '../src/command
 
 const CLI = path.join(import.meta.dirname, '..', 'src', 'cli.js');
 const FIXTURE_ASAR = path.join(import.meta.dirname, 'fixtures', 'official-desktop.asar');
+const FIXTURE_ASAR_NODESC = path.join(import.meta.dirname, 'fixtures', 'official-desktop-nodescriptor.asar');
 const ENV_KEYS = ['HOME', 'USERPROFILE', 'DSH_HOME', 'LOCALAPPDATA', 'APPDATA', 'npm_config_prefix', 'XDG_CONFIG_HOME'];
+
+/**
+ * Run fn with process.platform and selected env vars overridden, restoring
+ * both afterwards. process.platform is a non-writable but CONFIGURABLE
+ * property, so defineProperty is the only override route — this is what
+ * makes the darwin/linux probe layouts testable off-platform (the v0.3.0
+ * macOS path bug shipped precisely because nothing exercised darwin).
+ */
+async function withPlatform(platform, env, fn) {
+  const savedPlatform = process.platform;
+  const savedEnv = {};
+  Object.defineProperty(process, 'platform', { value: platform });
+  for (const [k, v] of Object.entries(env)) {
+    savedEnv[k] = process.env[k];
+    if (v === null) delete process.env[k]; else process.env[k] = v;
+  }
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(process, 'platform', { value: savedPlatform });
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+}
 
 /** Point HOME/USERPROFILE at a fresh fixture dir and wipe discovery-relevant env. */
 function envSandbox(t) {
@@ -121,6 +147,10 @@ test('T1 catalog: unique ids, array order is the normative priority (drift lock)
     for (const b of h.bundles ?? []) {
       assert.ok(['win32', 'darwin', 'linux'].includes(b.platform), `${h.id}: platform must be explicit`);
       assert.ok(['asar', 'plain'].includes(b.container));
+      // every probe declares its marker KIND and, for asar, the archive
+      // segments (win32: resources/app.asar; darwin: app.asar directly)
+      assert.ok(['descriptor', 'package'].includes(b.kind), `${h.id}: kind must be explicit`);
+      assert.ok(b.container !== 'asar' || Array.isArray(b.archive), `${h.id}: asar probes declare archive segments`);
     }
   }
   const official = DESKTOP_HOSTS.find((h) => h.id === 'deepseek-harness-desktop');
@@ -154,6 +184,12 @@ test('T2 looksLikeDshHome requires real harness data, not bare directories', (t)
   assert.equal(looksLikeDshHome(dir), false, 'profiles/node_modules is not a profile');
   fs.mkdirSync(path.join(dir, 'profiles', 'bare'), { recursive: true });
   assert.equal(looksLikeDshHome(dir), false, 'a profile dir without its package.json manifest does not count');
+  // an unrelated project manifest must not qualify: the harness writes a
+  // `dsh` field into every real profile manifest
+  fs.mkdirSync(path.join(dir, 'profiles', 'unrelated'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'profiles', 'unrelated', 'package.json'), JSON.stringify({ name: 'unrelated-project' }));
+  assert.equal(looksLikeDshHome(dir), false, 'a manifest without the dsh field is not a harness profile');
+  fs.rmSync(path.join(dir, 'profiles', 'unrelated'), { recursive: true, force: true });
   makeProfile(dir);
   assert.equal(looksLikeDshHome(dir), true, 'profile manifest counts');
   const s = path.join(dir, 'sessions-only');
@@ -165,13 +201,15 @@ test('T2 looksLikeDshHome requires real harness data, not bare directories', (t)
 
 // ---- T3/T4: home resolution ----
 
-test('T3 resolveHome: flag and env win, never gated, non-string fails readably', (t) => {
+test('T3 resolveHome: flag and env win, never gated, non-string or blank fails readably', (t) => {
   const dir = envSandbox(t);
   const r1 = resolveHome(path.join(dir, 'explicit-home'));
   assert.equal(r1.origin, 'flag');
   assert.equal(r1.home, path.resolve(path.join(dir, 'explicit-home')));
   assert.equal(r1.alternates.length, 0);
   assert.throws(() => resolveHome(true), /--home must be a path string/, 'bare --home from parseArgs must fail readably');
+  assert.throws(() => resolveHome(''), /--home must not be empty/, 'an explicit blank --home is a mistake, not "unset"');
+  assert.throws(() => resolveHome('   '), /--home must not be empty/);
   process.env.DSH_HOME = path.join(dir, 'env-home');
   const r2 = resolveHome();
   assert.equal(r2.origin, 'env');
@@ -380,6 +418,81 @@ test('T7 the npm prefix is a fallback, never a competitor', (t) => {
   const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
   assert.equal(e.version, '0.2.0-rc.2', 'a desktop hit outranks the prefix shim');
   assert.ok(!e.sources.some((s) => s.host === 'npm-prefix'), 'the shim version must not manufacture ambiguity');
+});
+
+test('T7 the platform gate filters probes: a darwin override must not leak win32 roots (regression)', async (t) => {
+  const dir = envSandbox(t);
+  const sentinel = path.join(dir, 'localappdata-sentinel');
+  await withPlatform('darwin', { HOME: dir, LOCALAPPDATA: sentinel, USERPROFILE: dir, APPDATA: null }, async () => {
+    const official = DESKTOP_HOSTS.find((h) => h.id === 'deepseek-harness-desktop');
+    const probes = bundleProbes(official);
+    assert.ok(probes.length >= 2, 'darwin probes exist');
+    for (const p of probes) {
+      assert.ok(!p.installRoot.includes('localappdata-sentinel'), `win32 probe leaked under a darwin platform: ${p.installRoot}`);
+      assert.deepEqual(p.archive, ['app.asar'], 'macOS keeps app.asar directly under Contents/Resources');
+    }
+    const anyHome = homeCandidates(DESKTOP_HOSTS.find((h) => h.id === 'dsh-desktop-anywhere-labs'));
+    assert.ok(anyHome.some((c) => c.home.includes('.dsh-beta')), 'beta home still resolves under darwin');
+  });
+});
+
+test('T7 darwin official probe hits Contents/Resources/app.asar; the doubled segment misses (N1)', async (t) => {
+  const dir = envSandbox(t);
+  await withPlatform('darwin', { HOME: dir, LOCALAPPDATA: null, APPDATA: null }, async () => {
+    const res = path.join(dir, 'Applications', 'DeepSeek Harness.app', 'Contents', 'Resources');
+    fs.mkdirSync(res, { recursive: true });
+    fs.copyFileSync(FIXTURE_ASAR, path.join(res, 'app.asar'));
+    const home = path.join(dir, 'no-profile-home');
+    const e = runtimeEvidence(home, null, 'desktop:deepseek-harness-desktop');
+    assert.equal(e.version, '0.2.0-rc.2', JSON.stringify(e.sources));
+    assert.equal(e.sources[0].source, 'desktop-runtime.json');
+    // the exact pre-fix join (Resources/resources/app.asar) must stay a miss
+    fs.rmSync(path.join(res, 'app.asar'));
+    fs.mkdirSync(path.join(res, 'resources'), { recursive: true });
+    fs.copyFileSync(FIXTURE_ASAR, path.join(res, 'resources', 'app.asar'));
+    const e2 = runtimeEvidence(home, null, 'desktop:deepseek-harness-desktop');
+    assert.equal(e2.version, null, 'Resources/resources/app.asar must never be accepted');
+  });
+});
+
+test('T7 descriptor absent → the package.json fallback carries the version (N2)', async (t) => {
+  const dir = envSandbox(t);
+  await withPlatform('win32', { LOCALAPPDATA: dir }, async () => {
+    installOfficial(dir, fs.readFileSync(FIXTURE_ASAR_NODESC));
+    const e = runtimeEvidence(path.join(dir, 'h'), null, 'desktop:deepseek-harness-desktop');
+    assert.equal(e.version, '0.2.0-rc.2');
+    assert.equal(e.sources[0].source, 'package.json', 'the fallback hit is labelled by its own source');
+  });
+});
+
+test('T7 descriptor present but untrusted → NO fallback, and the marker is listed (N2)', async (t) => {
+  const dir = envSandbox(t);
+  await withPlatform('win32', { LOCALAPPDATA: dir }, async () => {
+    const desc = Buffer.from(JSON.stringify({
+      schemaVersion: 1,
+      release: { version: '1.0.0' },
+      sharedPackages: { '@deepseek-ai/dsh': { name: '@deepseek-ai/dsh', version: '1.0.0' } },
+    }));
+    const pkg = Buffer.from(JSON.stringify({ name: '@deepseek-ai/dsh', version: '1.0.0' }));
+    installOfficial(dir, buildMiniAsar([
+      { path: 'dsh/desktop-runtime.json', data: desc },
+      { path: 'dsh/node_modules/@deepseek-ai/dsh/package.json', data: pkg },
+    ]));
+    const e = runtimeEvidence(path.join(dir, 'h'), null, 'desktop:deepseek-harness-desktop');
+    assert.equal(e.version, null, 'an untrusted descriptor must not be bypassed through the fallback');
+    assert.equal(e.untrusted.length, 1, 'the untrusted marker is reported, not silently dropped');
+    assert.equal(e.untrusted[0].host, 'deepseek-harness-desktop');
+  });
+});
+
+test('T7 without npm_config_prefix no global tree is discovered (documented contract)', (t) => {
+  const dir = envSandbox(t);
+  const nm = path.join(dir, 'npm-global', 'node_modules', '@deepseek-ai', 'dsh');
+  fs.mkdirSync(nm, { recursive: true });
+  fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ version: '9.9.9' }));
+  const e = runtimeEvidence(path.join(dir, 'h'), null, undefined);
+  assert.equal(e.version, null, 'a global install outside npm scripts is not probed: pass --current');
+  assert.deepEqual(e.sources, []);
 });
 
 // ---- T8: desktop scoping ----
