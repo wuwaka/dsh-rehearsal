@@ -11,6 +11,8 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-10-05
+
 ### Fixed
 
 - The npm install of the candidate now runs under a credential-stripped environment: with `--run-scripts`, dependency lifecycle scripts used to inherit the full parent environment, so the escape hatch that grants script execution also re-exposed host secrets. It now strips every credential-shaped variable, same rule as the candidate's own runs.
@@ -300,7 +302,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...HEAD
+[0.3.13]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
 [0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1

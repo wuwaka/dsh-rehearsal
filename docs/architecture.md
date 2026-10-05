@@ -25,10 +25,11 @@ README 只回答"是什么、怎么跑、结果意味着什么"。这份文档�
 
 | 文件 | 职责 |
 |---|---|
-| `src/cli.js` | 参数解析、命令分派、退出码、`clean` 的目录 ownership 守卫 |
+| `src/cli.js` | 命令分派、退出码、`clean` 的目录 ownership 守卫 |
+| `src/lib/args.js` | CLI 旗标解析：连字符与 camelCase 双拼写、开关类真值契约 |
 | `src/commands/check.js` | 只读预检（盘点 + peer 图） |
 | `src/commands/run.js` | 预演流水线与各阶段判定 |
-| `src/lib/util.js` | 共享助手：子进程调用、无键环境、版本参数校验、目录 ownership 标记 |
+| `src/lib/util.js` | 共享助手：子进程调用、凭据剥离环境（安装/运行共用）、版本参数校验、目录 ownership 标记 |
 | `src/lib/dshhome.js` | profile 枚举、当前运行时探测 |
 | `src/lib/desktops.js` | 桌面宿主探测表：应用束与隔离 home 候选、来源分级 |
 | `src/lib/asar.js` | 只读 asar 读取器：部分读取、档内路径、unpacked/link 一律 miss |

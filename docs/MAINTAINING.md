@@ -48,8 +48,8 @@
 ## npm registry 状态
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
-- **`v0.3.12`（2026-10-05）GitHub Release 已切齐**（评审第六轮修复：版本参数边界校验、`clean` 与 `--shadow-dir`/`--prefix-dir` 的 ownership 守卫、profile 运行时三态、单段 POSIX 路径、npm 包文件边界测试等，见 CHANGELOG；CI 六组合全绿，附件 tgz + `.sha256`）。`v0.3.11`、`v0.3.1`、`v0.3.0`（同日发布）保留在 GitHub Release，均含各自发布时的缺陷。
-- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.12），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。`0.2.2`、`0.3.0`、`0.3.1` 与 `0.3.11` 都不会上 npm registry，只以 GitHub Release 附件存在。
+- **`v0.3.13`（2026-10-05）GitHub Release 已切齐**（评审第七轮修复：安装路径凭据剥离、CLI 旗标统一契约、`clean` 结构判定、README 链接绝对化等，见 CHANGELOG；CI 六组合全绿，附件 tgz + `.sha256`）。`v0.3.12`、`v0.3.11`、`v0.3.1`、`v0.3.0`（同日发布）保留在 GitHub Release，均含各自发布时的缺陷。
+- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.13），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。`0.2.2`、`0.3.0`、`0.3.1`、`0.3.11` 与 `0.3.12` 都不会上 npm registry，只以 GitHub Release 附件存在。
 - dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——与上面那次 dispatch 同一会话顺手处理。
 
 ## 新增一条失效签名

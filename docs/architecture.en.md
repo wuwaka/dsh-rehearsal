@@ -25,10 +25,11 @@ Mechanically, the candidate `dsh` is a child process this tool npm-installs into
 
 | File | Responsibility |
 |---|---|
-| `src/cli.js` | argument parsing, command dispatch, exit codes, the `clean` directory-ownership guard |
+| `src/cli.js` | command dispatch, exit codes, the `clean` directory-ownership guard |
+| `src/lib/args.js` | CLI flag parsing: dashed and camelCase spellings, the switch truth-value contract |
 | `src/commands/check.js` | read-only pre-flight (inventory + peer graph) |
 | `src/commands/run.js` | rehearsal pipeline and per-stage verdicts |
-| `src/lib/util.js` | shared helpers: subprocess calls, keyless environment, version-option validation, directory ownership markers |
+| `src/lib/util.js` | shared helpers: subprocess calls, credential-stripped environments (install and runs alike), version-option validation, directory ownership markers |
 | `src/lib/dshhome.js` | profile enumeration, current runtime detection |
 | `src/lib/desktops.js` | desktop host catalog: bundle and isolated-home candidates, provenance grades |
 | `src/lib/asar.js` | read-only asar reader: partial reads, in-archive paths, unpacked/link always miss |

@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-10-05
+
 ### 修复
 
 - 候选安装的 npm 过程改在剥除凭据的环境下运行：开启 `--run-scripts` 时，依赖生命周期脚本此前继承完整宿主环境——授予脚本执行的逃生门顺带重新暴露了宿主凭据。现在与候选运行同规则剥离全部凭据形状变量。
@@ -243,7 +245,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...HEAD
+[0.3.13]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
 [0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
