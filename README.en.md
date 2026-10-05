@@ -50,7 +50,7 @@ The rehearsal installs the candidate and cold-boots it under a private `DSH_HOME
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.3.0   # or pin to a GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.1   # or pin to a GitHub tag
 ```
 
 Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
@@ -145,7 +145,7 @@ Exact guarantees, explicitly dangerous options, and what is out of scope: [SECUR
 | Candidate source | npm / self-hosted `web` and `headless` profiles |
 | Runtime dependency | `semver` |
 
-Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session generations `v0`/`v3`/`v4` (tested on 2026-10-02). Tested ≠ supported: anything not listed should be treated as untested.
+Tested versions: candidate `dsh` `0.2.0-rc.2`, Node `22.22.2`, Windows, session generations `v0`/`v3`/`v4` (tested on 2026-10-02); desktop probes: official 0.2.0-rc.2 silent install on Windows, 2026-10-05. Tested ≠ supported: anything not listed should be treated as untested.
 
 ## Limitations
 

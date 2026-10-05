@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-05
+
 ### 修复
 
 - 桌面 bundle 探针的平台过滤失效：平台门读取的是不含该字段的对象，任何平台上都会探测全部宿主的安装路径（macOS 上会先试 Windows 路径）。现在按条目自身的平台过滤，并有"darwin 下不得泄漏 win32 路径"的回归测试。
@@ -17,6 +19,7 @@
 - `writeReport()` 不再把 `privacy.scrubbed` 当跳过令牌：每次落盘都重新 `finalize()`。实测缺口：finalize 之后被追加的字段会原样入库，而脱敏标志仍声称干净。
 - 非法 peer 范围不再读作"两侧都不满足"的既有失配：新增 `peer-range-unparseable` 警告发现项说明真实原因；satisfies 包装的兜底分支返回 false 而不是 true。
 - `--home=`（空值）报可读错误，不再静默落到自动发现；home 门禁要求 profile manifest 带 harness 的 `dsh` 字段（无关项目的 package.json 不再算数）；`--prefix-dir` 跨 candidate 复用时 adoption-gate 备份按版本重播种；npm 前缀探测的契约（仅 `npm_config_prefix` 存在时生效）写进代码与测试。
+- 上述每项修复都带回归锁（测试数 106 → 114）：跨平台探针泄漏、darwin 命中与双拼 miss、描述符缺席回退与不可信不回退、finalize 后追加字段、非法 peer 范围、空 `--home`。
 
 ## [0.3.0] - 2026-10-05
 
@@ -198,7 +201,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1

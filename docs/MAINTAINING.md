@@ -41,14 +41,14 @@
 
 ## 桌面宿主探测环境
 
-- 本机装有官方 DeepSeek Harness Desktop 0.2.0-rc.2（`%LOCALAPPDATA%\Programs\DeepSeek Harness`，`/S` 静默安装，**从未启动**——官方与社区版共用 `~/.dsh/profiles/desktop`，启动任何一方都会改写另一方管理的 profile）。它是 v0.3.0 探测链的实测来源：asar 头部 3,392,064 B、真实 `dsh/desktop-runtime.json` 样本、`versionsEqual=true` 约束的复验都出自它；探针脚本与提取产物在 `%TEMP%\dsh-official-probe\`（临时目录，清理无碍）。
+- 本机装有官方 DeepSeek Harness Desktop 0.2.0-rc.2（`%LOCALAPPDATA%\Programs\DeepSeek Harness`，`/S` 静默安装，**从未启动**——官方与社区版共用 `~/.dsh/profiles/desktop`，启动任何一方都会改写另一方管理的 profile）。它是 v0.3.0/0.3.1 探测链的实测来源：asar 头部 3,392,064 B、真实 `dsh/desktop-runtime.json` 样本、`versionsEqual=true` 约束的复验都出自它；探针脚本与提取产物在 `%TEMP%\dsh-official-probe\`（临时目录，清理无碍）。
 - 待办：卸载官方版（`"%LOCALAPPDATA%\Programs\DeepSeek Harness\Uninstall DeepSeek Harness.exe" /S`）后重跑一次 `check` 完成卸载态验收（current 应仍为 0.2.0-rc.2，来源切到社区 bundle）；之后清理 `..\dsh-desktop-research\`（五个上游克隆，基线提交见 architecture.md 的探测表一节）。
 
 ## npm registry 状态
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
-- **`v0.3.0`（2026-10-05）GitHub Release 已切齐**（提交 `f88a343` + `605c2c3`，CI 六组合全绿，附件 tgz + `.sha256` 并已下载复验 sha256），但同日 npm 发布仍被账号暂停拒绝（见下）。**`0.2.2` 因此不会上 npm registry**，只以 GitHub Release 附件存在。
-- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.0），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。
+- **`v0.3.1`（2026-10-05）GitHub Release 已切齐**（修复 macOS 探针、平台门、描述符回退等 0.3.0 发布后发现的缺陷，见 CHANGELOG；CI 六组合全绿，附件 tgz + `.sha256`）。`v0.3.0`（同日发布）含这些缺陷，npm 上从未出现过，GitHub Release 附件保留。
+- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.1），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。`0.2.2` 与 `0.3.0` 都不会上 npm registry，只以 GitHub Release 附件存在。
 - dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——与上面那次 dispatch 同一会话顺手处理。
 
 ## 新增一条失效签名

@@ -50,7 +50,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.3.0   # 或固定到 GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.1   # 或固定到 GitHub tag
 ```
 
 两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
@@ -145,7 +145,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 | 候选来源 | npm / 自托管的 `web`、`headless` profile |
 | 运行时依赖 | `semver` |
 
-Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代际 `v0`/`v3`/`v4`（Tested on 2026-10-02）。Tested ≠ supported：未列出的组合按未测试处理。
+Tested 版本：候选 `dsh` `0.2.0-rc.2`、Node `22.22.2`、Windows、会话代际 `v0`/`v3`/`v4`（Tested on 2026-10-02）；桌面探测：Windows 官方 0.2.0-rc.2 静默安装，2026-10-05。Tested ≠ supported：未列出的组合按未测试处理。
 
 ## 限制
 

@@ -11,6 +11,8 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-05
+
 ### Fixed
 
 - Desktop bundle probes were not platform-filtered: the gate read a `platform` field off an object that does not carry one, so every platform probed every host's install paths (on macOS the Windows paths would be attempted first). The gate now filters catalog entries themselves, with a regression test that fails if win32 roots leak under a darwin platform.
@@ -19,6 +21,7 @@ refuses to publish when either lacks the section for a tag.
 - `writeReport()` no longer treats `privacy.scrubbed` as a skip token: it re-runs `finalize()` on every write. Measured gap: a field appended after a previous finalize reached disk unscrubbed while the flag still claimed clean.
 - Unparseable peer ranges no longer read as a settled "excluded by both versions": a dedicated `peer-range-unparseable` warn finding says what is actually wrong, and the satisfies wrapper returns false on its belt-and-braces path instead of true.
 - `--home=` (blank) now fails with a readable error instead of silently falling through to auto-discovery; the home gate requires the harness `dsh` field in a profile manifest (an unrelated project's `package.json` no longer qualifies); the adoption-gate backup re-seeds when a reused `--prefix-dir` gets a different candidate version; the npm-prefix probe's contract (only when `npm_config_prefix` is present) is stated in code and tests.
+- Regression locks for each fix above (test count 106 → 114): cross-platform probe leakage, the darwin hit and the doubled-path miss, descriptor-absent fallback versus untrusted no-fallback, post-finalize mutation, unparseable peer ranges, and a blank `--home`.
 
 ## [0.3.0] - 2026-10-05
 
@@ -255,7 +258,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.0...v0.2.1

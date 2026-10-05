@@ -62,7 +62,7 @@ peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断�
 
 ## 桌面宿主探测表与 home 发现
 
-`check` 与 `run` 的目标 home 按 `--home` → `DSH_HOME` → 已验证的默认 home → 探测表的顺序解析。前三档未命中时，`src/lib/desktops.js` 登记的桌面宿主（官方 DeepSeek Harness Desktop、anywhere-labs 的 DSH Desktop、dataelement 的 DSHDesktop）按登记顺序给出候选，逐一通过结构验证（存在带 package.json 的 profile，或 sessions 下存在真实代际日志）才被采用；myYangyunfan 与 vibeinging 的 home 与默认重合且无可读运行时标记，不设条目。路径证据分三档随条目登记：实测-本机、实测-源码（基线提交：官方 `5badb15`、anywhere-labs `a1ff68b`、dataelement `beb6821`）、推断；来源分级不参与选择优先级。
+`check` 与 `run` 的目标 home 按 `--home` → `DSH_HOME` → 已验证的默认 home → 探测表的顺序解析。前三档未命中时，`src/lib/desktops.js` 登记的桌面宿主（官方 DeepSeek Harness Desktop、anywhere-labs 的 DSH Desktop、dataelement 的 DSHDesktop）按登记顺序给出候选，逐一通过结构验证（profile manifest 带 harness 的 `dsh` 字段，或 sessions 下存在真实代际日志）才被采用；myYangyunfan 与 vibeinging 的 home 与默认重合且无可读运行时标记，不设条目。路径证据分三档随条目登记：实测-本机、实测-源码（基线提交：官方 `5badb15`、anywhere-labs `a1ff68b`、dataelement `beb6821`）、推断；来源分级不参与选择优先级。
 
 官方桌面的 dsh 运行时整树在 `resources/app.asar` 的 `dsh/` 子树内，版本取自档内 `dsh/desktop-runtime.json` 的 `sharedPackages`（数组，上游强制 `@deepseek-ai/dsh` 版本与 `release.version` 相等），读取由零依赖的 `src/lib/asar.js` 完成：只读、部分读取、`unpacked`/`link` 条目一律 miss。anywhere-labs 的内置运行时经未打包的 `resources/app` 直接可读。
 
