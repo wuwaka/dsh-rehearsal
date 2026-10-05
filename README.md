@@ -50,7 +50,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.3.1   # 或固定到 GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.11   # 或固定到 GitHub tag
 ```
 
 两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（见 [PUBLISHING.md](PUBLISHING.md)）。
@@ -128,7 +128,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 - 真实 home 与桌面宿主安装目录只读；发现与探测只做文件解析。
 - 形如凭据的环境变量全部剔除，遥测强制关闭。
 - 历史工具调用默认不执行（fail-closed 只读允许清单）。
-- 报告写盘前脱敏；影子数据除 `--keep` 与显式 `--shadow-dir` 外一律清理，外部指定目录不归 `clean` 管。
+- 报告写盘前脱敏，脱敏未过则拒绝出报告；影子数据除 `--keep` 与显式 `--shadow-dir` 外一律清理，外部指定目录不归 `clean` 管。
 
 准确的保证、显式危险的选项、以及范围之外，见 [SECURITY.md](SECURITY.md)。
 

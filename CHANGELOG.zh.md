@@ -9,12 +9,15 @@
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-10-05
+
 ### 修复
 
 - 报告脱敏收口（评审第五轮 P1-1/P1-2）：home 路径规则此前在空格处截断，`C:\Users\John Smith\.dsh` 会漏出姓氏，干净 home 路径也会留下整段尾巴（`~\AppData\Local\Temp\run-1`，均实测）；现在 home 字段按字段边界整段归一（干净路径仍归一为 `~`，含空格的字段升级为 `<abs-path>`）。`writeReport()` 同时改为 fail-closed：invariant 仍发现 path-shaped 文本时**拒绝写盘**（此前先警告再照写，与"落盘前已脱敏"的承诺相矛盾）。
 - 运行时证据补全（P2-1）：描述符存在但校验不过的 `untrusted` 标记进入 `b1` 证据的 `currentRuntime.untrusted` 与 `coverage.host.runtimeUntrusted`，"current 为什么是 null"可诊断。
 - 非字符串 peer 范围（`null`、数字、对象）产出 `peer-range-unparseable` 警告，不再被读作"无约束"（P2-2）；真缺席（`undefined`、空白串）语义不变。
 - 收紧：`looksLikeDshHome` 要求 `dsh.profile.bundles` 数组（P2-5）；candidate 版本不可读时 adoption-gate 拒绝打补丁而不是猜测备份基准（P2-4）；README、`--help` 与 SECURITY 写明 `--shadow-dir`/`--prefix-dir` 不被自动清理、也不归 `clean` 管（P2-3）。
+- 上述每项修复都带回归锁（测试数 114 → 117）：含空格 home 的尾巴、fail-closed 拒写、untrusted 进入报告、带类型的 peer 范围、版本未知时的闸门。
 
 ## [0.3.1] - 2026-10-05
 
@@ -208,7 +211,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...HEAD
+[0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
 [0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.1...v0.2.2

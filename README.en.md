@@ -50,7 +50,7 @@ The rehearsal installs the candidate and cold-boots it under a private `DSH_HOME
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.3.1   # or pin to a GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.11   # or pin to a GitHub tag
 ```
 
 Neither path requires an npm account. To pin an install to exact bytes, use the tarball and `.sha256` attached to the Release (see [PUBLISHING.en.md](PUBLISHING.en.md)).
@@ -128,7 +128,7 @@ The write-round share is not migration coverage. Per-session coverage is in the 
 - The real home and desktop install directories are read-only; discovery and probing only parse files.
 - Credential-shaped environment variables are stripped, and telemetry is force-disabled.
 - Recorded tool calls do not execute by default (fail-closed read-only allowlist).
-- Reports are sanitized before being written; shadow data is removed unless `--keep` or an explicit `--shadow-dir` is used, and externally chosen directories are not touched by `clean`.
+- Reports are sanitized before being written and a failed scrub refuses to emit a report; shadow data is removed unless `--keep` or an explicit `--shadow-dir` is used, and externally chosen directories are not touched by `clean`.
 
 Exact guarantees, explicitly dangerous options, and what is out of scope: [SECURITY.en.md](SECURITY.en.md).
 

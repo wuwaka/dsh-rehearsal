@@ -66,7 +66,7 @@ peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断�
 
 官方桌面的 dsh 运行时整树在 `resources/app.asar` 的 `dsh/` 子树内，版本取自档内 `dsh/desktop-runtime.json` 的 `sharedPackages`（数组，上游强制 `@deepseek-ai/dsh` 版本与 `release.version` 相等），读取由零依赖的 `src/lib/asar.js` 完成：只读、部分读取、`unpacked`/`link` 条目一律 miss。anywhere-labs 的内置运行时经未打包的 `resources/app` 直接可读。
 
-`current` 的解析分层：profile 内安装命中即权威；否则桌面内置运行时按 home 来源过滤——桌面来源的 home 只信自己宿主的 bundle，共享 home 探全部宿主（包括装了但从未启动的宿主），版本冲突返回 null 并以 `currentAmbiguous` 列出各宿主的版本；npm 前缀只在 `npm_config_prefix` 存在（npm 脚本环境）且前面全部落空时兜底。探测项按 `kind` 分两类：描述符（`desktop-runtime.json`）缺失时回退到档内 `package.json`；描述符存在但不可信（schema 漂移、版本不等）时保持未知并把标记记入 `untrusted`，不回退——回退会绕过描述符的完整性交叉校验。平台过滤与 asar 档位置（`archive`，Windows 为 `resources/app.asar`、macOS 为 `Contents/Resources/app.asar`）逐条声明在探测表里。current 未知时，peer 范围排除候选的插件按 high 分级，报告写明该后果，并指向 `--current`。
+`current` 的解析分层：profile 内安装命中即权威；否则桌面内置运行时按 home 来源过滤——桌面来源的 home 只信自己宿主的 bundle，共享 home 探全部宿主（包括装了但从未启动的宿主），版本冲突返回 null 并以 `currentAmbiguous` 列出各宿主的版本；npm 前缀只在 `npm_config_prefix` 存在（npm 脚本环境）且前面全部落空时兜底。探测项按 `kind` 分两类：描述符（`desktop-runtime.json`）缺失时回退到档内 `package.json`；描述符存在但不可信（schema 漂移、版本不等）时保持未知并把标记记入 `untrusted`（报告证据可见），不回退——回退会绕过描述符的完整性交叉校验。平台过滤与 asar 档位置（`archive`，Windows 为 `resources/app.asar`、macOS 为 `Contents/Resources/app.asar`）逐条声明在探测表里。current 未知时，peer 范围排除候选的插件按 high 分级，报告写明该后果，并指向 `--current`。
 
 `run` 对纯桌面歧义（无有效默认 home 且 ≥2 个验证通过的桌面 home）要求显式 `--home`；唯一候选自动进行，`check` 全自动。桌面来源的预演在报告中带范围警告与 `coverage.host`（`desktopRuntimeTested: false`）。
 
