@@ -9,6 +9,8 @@
 
 ## [Unreleased]
 
+## [0.3.12] - 2026-10-05
+
 ### 修复
 
 - 版本参数在命令边界校验（`--candidate`/`--current`/`--to`）：实测 `check --candidate nonsense` 曾以 exit 0、`upgrade-ok` 收场——比较根本没执行，结论从零拼出；现在非法版本直接报错（exit 3），且发生在任何安装与产物写入之前。
@@ -230,7 +232,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...HEAD
+[0.3.12]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
 [0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0

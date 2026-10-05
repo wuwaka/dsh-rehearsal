@@ -32,7 +32,7 @@
 | P2-10 | medium | fixed | numeric overflow in the multi-frame memo key |
 | P2-11 | medium | retained (disclosed) | the adoption-gate patch modifies the code under test |
 | P2-12 | medium | fixed | `--sample` accepted non-numeric input |
-| §7 P3 (8 items) | low | 7 dispositioned | **P3-5 (`--to latest`/`next` versus Desktop app-release units) has no disposition record** |
+| §7 P3 (8 items) | low | 8 dispositioned | P3-5 (`--to latest`/`next` versus Desktop app-release units): `--to` now requires an exact semver, so dist-tags such as `latest`/`next` are rejected at the input layer — the unit confusion can no longer occur (2026-10-05) |
 | §8 unverified (6 items) | — | 3 closed | the rest remain unverified and are kept verbatim |
 
 

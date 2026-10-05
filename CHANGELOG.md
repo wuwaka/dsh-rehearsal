@@ -11,6 +11,8 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.12] - 2026-10-05
+
 ### Fixed
 
 - Version-valued options are validated at the command boundary (`--candidate`, `--current`, `--to`): measured, `check --candidate nonsense` used to exit 0 with `upgrade-ok` — the comparison never ran and the verdict was assembled from nothing. An invalid version now fails with a readable error (exit 3) before any install or artifact write.
@@ -287,7 +289,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...HEAD
+[0.3.12]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
 [0.3.1]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.2.2...v0.3.0
