@@ -59,7 +59,7 @@ function decodeFrom(buf, start, offsets, idx, parts, failed) {
     const end = i < offsets.length ? offsets[i] : buf.length;
     if (end <= start) continue;
     // String key: numeric start*2^32+end exceeds MAX_SAFE_INTEGER for files
-    // >~2.1MB, silently merging distinct failed boundaries (audit P2-10).
+    // >~2.1MB, silently merging distinct failed boundaries.
     const key = `${start}:${end}`;
     if (failed.has(key)) continue;
     let decoded;

@@ -9,9 +9,14 @@ import { resolveHome, runtimeEvidence, defaultHome, listProfiles, inspectProfile
 import { discoverSessions } from '../lib/sessions.js';
 import { analyzePeerGraph } from '../lib/peers.js';
 import { newReport, addStage, finalize, toMarkdown, homeShape, writeReport } from '../lib/report.js';
-import { stageTimer } from '../lib/util.js';
+import { stageTimer, validateVersionOption, claimOwnedDir } from '../lib/util.js';
 
 export async function cmdCheck(opts) {
+  // Version-valued options are validated at the boundary: an unvalidated
+  // `--candidate nonsense` does not fail, it silently skips every peer
+  // comparison and reports a clean-looking verdict (measured 2026-10-05).
+  validateVersionOption(opts.candidate, '--candidate');
+  validateVersionOption(opts.current, '--current');
   // Home resolution: --home > DSH_HOME > a validated default home > a
   // validated host-catalog home (check is read-only, so a discovered desktop
   // home is used directly, labelled, with alternates surfaced when several
@@ -25,6 +30,9 @@ export async function cmdCheck(opts) {
   }
   const artifactsDir = path.resolve(opts.artifacts ?? path.join(process.cwd(), '.dsh-rehearsal', `check-${Date.now()}`));
   fs.mkdirSync(artifactsDir, { recursive: true });
+  // best-effort ownership: a shared pre-existing --artifacts dir stays usable
+  // (reports are additive), it just cannot be removed by `clean` later
+  claimOwnedDir(artifactsDir, 'artifact');
 
   // ---- A: inventory
   let ms = stageTimer();
@@ -63,7 +71,7 @@ export async function cmdCheck(opts) {
   }
 
   // ---- B1: peer graph. current auto-detected ONCE with provenance, reused
-  // by the analysis and the details line (round-3 nit: was probed twice).
+  // by the analysis and the details line, so the probe chain runs once.
   ms = stageTimer();
   const evidence0 = opts.current
     ? { version: opts.current, sources: [{ host: '--current', version: opts.current, source: '--current' }], ambiguous: null }

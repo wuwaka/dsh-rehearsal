@@ -15,7 +15,7 @@ import { installCandidate, mountReplayPlugin, headlessRun, writeReplayPatch, pat
 import { readIntegrity, writeRound, matchSignatures, extractRoutes, sanitizeStderr, extractHistoryTools, classifyHistory, writeRoundVerdict } from '../lib/drill.js';
 import { decodeAll } from '../lib/zfstd.js';
 import { newReport, addStage, finalize, toMarkdown, writeReport } from '../lib/report.js';
-import { stageTimer } from '../lib/util.js';
+import { stageTimer, validateVersionOption, claimOwnedDir } from '../lib/util.js';
 
 export const BOOT_SIGNATURES = [
   { id: 'patch-entry-not-found', pattern: /patch:\s*entry\s*"[^"]+"\s*not found/i, note: 'upstream #1294 class: a patch row targets a missing entry (also seen as transient jitter — hence two cold boots)' },
@@ -51,7 +51,7 @@ export function desktopDataContext(origin, profileName, current, extra = {}) {
   if (extra.currentAmbiguous) host.currentAmbiguous = extra.currentAmbiguous;
   if (extra.runtimeSources?.length) host.runtimeSources = extra.runtimeSources;
   // markers that exist but failed validation: first-class provenance, so
-  // "current unknown" can explain WHY (review round 5, P2-1)
+  // "current unknown" can explain WHY
   if (extra.runtimeUntrusted?.length) host.runtimeUntrusted = extra.runtimeUntrusted;
   if (!host.desktopScoped) return { scoped: false, host };
   const via = viaOrigin ? `the ${host.desktopApp} desktop home` : `the desktop-named profile "${profileName}"`;
@@ -65,7 +65,7 @@ export function desktopDataContext(origin, profileName, current, extra = {}) {
 }
 
 /**
- * Pure-desktop ambiguity gate (v0.3.0 design): when no valid default home
+ * Pure-desktop ambiguity gate: when no valid default home
  * exists and TWO OR MORE desktop homes validate, `run` refuses to choose an
  * experiment target implicitly — `check` (read-only) proceeds with the
  * first and a warning. One validating candidate proceeds labelled.
@@ -82,6 +82,26 @@ export function desktopAmbiguityGate(resolved) {
 
 export async function cmdRun(opts) {
   if (!opts.to) throw new Error('run requires --to <version> (exact candidate version, e.g. 0.2.0-rc.2)');
+  // Validate every version-valued option BEFORE anything expensive happens:
+  // an invalid --to would otherwise attempt a network install of a
+  // nonexistent version, and an invalid --current would silently turn the
+  // peer classification into "current unknown".
+  validateVersionOption(opts.to, '--to');
+  validateVersionOption(opts.current, '--current');
+  // CLI parses `--preset-mode patch` into opts['preset-mode'] (kebab-case
+  // keys); accept both spellings so the flag actually takes effect. The
+  // value must be one of the two documented modes — anything else used to
+  // fall through to the default silently.
+  const presetMode = opts.presetMode ?? opts['preset-mode'] ?? 'skip';
+  if (!['skip', 'patch'].includes(presetMode)) {
+    throw new Error(`--preset-mode must be skip or patch, got ${JSON.stringify(presetMode)}`);
+  }
+  // Same contract as --sample: a non-numeric budget used to become NaN, the
+  // `>= budget` cap comparison then never fired, and the write round ran
+  // unbounded over the candidate set instead of erroring.
+  const rawWriteRounds = opts.writeRounds ?? opts['write-rounds'] ?? 3;
+  const writeRounds = Number(rawWriteRounds);
+  if (!Number.isInteger(writeRounds) || writeRounds < 1) throw new Error(`--writeRounds must be a positive integer, got ${JSON.stringify(rawWriteRounds)}`);
   // Home resolution (desktop compatibility): --home > DSH_HOME > a validated
   // default home > a validated host-catalog home. The origin rides in the
   // report as a LABEL (never a path) so a desktop-discovered run is auditable.
@@ -91,6 +111,9 @@ export async function cmdRun(opts) {
   report.target.homeOrigin = resolved.origin;
   const artifactsDir = path.resolve(opts.artifacts ?? path.join(process.cwd(), '.dsh-rehearsal', `run-${opts.to}-${Date.now()}`));
   fs.mkdirSync(artifactsDir, { recursive: true });
+  // best-effort ownership: a shared pre-existing --artifacts dir stays usable
+  // (reports are additive), it just cannot be removed by `clean` later
+  claimOwnedDir(artifactsDir, 'artifact');
   const gate = desktopAmbiguityGate(resolved);
   if (gate.block) {
     report.warnings.push(gate.message);
@@ -102,7 +125,7 @@ export async function cmdRun(opts) {
     console.log(`  [run] home resolved from host catalog: ${resolved.origin.slice('desktop:'.length)}`);
   }
   if (resolved.alternates.length) {
-    // N5: printed NOW, not only in the end-of-run summary — the pipeline
+    // Printed NOW, not only in the end-of-run summary — the pipeline
     // installs ~500 packages before renderSummary() runs, and "also valid:
     // …" arriving minutes later is useless for a decision this early.
     const warn = `multiple valid homes detected (selected ${resolved.origin}; also valid: ${resolved.alternates.join(', ')}) — pass --home to disambiguate`;
@@ -117,13 +140,10 @@ export async function cmdRun(opts) {
   const profiles = names.map((n) => inspectProfile(home, n));
   const live = opts.profile ? profiles.find((p) => p.name === opts.profile) : pickLiveProfile(profiles.filter((p) => p.exists));
   const { sessions } = discoverSessions(home);
-  // CLI parses `--preset-mode patch` into opts['preset-mode'] (kebab-case
-  // keys); accept both spellings so the flag actually takes effect.
-  const presetMode = opts.presetMode ?? opts['preset-mode'] ?? 'skip';
   const sampleN = Number(opts.sample ?? 20);
   if (!Number.isInteger(sampleN) || sampleN < 1) throw new Error(`--sample must be a positive integer, got ${JSON.stringify(opts.sample)}`);
   const cls = classify(sessions, { sample: sampleN, full: opts.full, includePreset: presetMode === 'patch' });
-  // Observability (audit round 4): selection is stratified, so preset-carrying
+  // Observability: selection is stratified, so preset-carrying
   // sessions get a proportional share instead of being tail-graded behind the
   // plain ones. Record the actual intersection: a `--preset-mode patch` run
   // that drills no preset session must say so, not silently patch the
@@ -159,7 +179,7 @@ export async function cmdRun(opts) {
 
   // ---- B1: peer graph vs candidate (no downloads). current is auto-detected
   // from the running installation so findings split into newly-broken-by-this-
-  // upgrade (high/blocking) vs pre-existing (warn) — audit P2-1.
+  // upgrade (high/blocking) vs pre-existing (warn).
   ms = stageTimer();
   // --current is authoritative when given; otherwise probe the chain with
   // provenance (profile node_modules → catalog bundles filtered by the home
@@ -210,7 +230,7 @@ export async function cmdRun(opts) {
   ms = stageTimer();
   const prefixDir = opts.prefixDir ?? path.join(artifactsDir, 'cli');
   const shadowHome = opts.shadowDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-rehearsal-home-'));
-  // Cleanup discipline (audit round 3, P2-5 completion): the shadow home
+  // Cleanup discipline: the shadow home
   // holds FULL session copies plus PLAINTEXT fixtures, so it must be removed
   // on EVERY exit path — success, early return, and throw — unless the
   // caller explicitly keeps it. cleanupShadow() is idempotent; the finally
@@ -235,9 +255,19 @@ export async function cmdRun(opts) {
   };
   let bin = null;
   try { // OUTER: guarantees shadow/prefix cleanup on every exit path
+    // Ownership gate, before anything is written or downloaded: a
+    // --shadow-dir / --prefix-dir is only used when it is missing, empty, or
+    // already carries this tool's marker. A non-empty unmarked directory is
+    // somebody's data that happens to sit at a path we were handed.
+    if (!claimOwnedDir(shadowHome, 'shadow')) {
+      throw new Error(`--shadow-dir ${opts.shadowDir ?? shadowHome} holds data but carries no dsh-rehearsal ownership marker — refusing to write into a directory this tool does not own`);
+    }
+    if (!claimOwnedDir(prefixDir, 'prefix')) {
+      throw new Error(`--prefix-dir ${opts.prefixDir ?? prefixDir} holds data but carries no dsh-rehearsal ownership marker — refusing to install into a directory this tool does not own`);
+    }
     try {
     bin = await installCandidate(opts.to, prefixDir, (l) => console.log('  [c-shadow]', l), { runScripts: Boolean(opts['run-scripts']) });
-    // Never modify the candidate for nothing (audit round 4): the adoption-gate
+    // Never modify the candidate for nothing: the adoption-gate
     // patch only matters when a preset-carrying session will actually drill.
     let gateApplied = false;
     if (presetMode === 'patch') {
@@ -348,7 +378,7 @@ export async function cmdRun(opts) {
   // drilled sessions actually used). Fixture per session = its own migrated
   // v4 generation, decompressed OUTSIDE the session dir.
   //
-  // SAFETY (audit P0-1) — three stacked layers:
+  // SAFETY — three stacked layers:
   //  a) process cwd is always the sandbox (header rewritten by copySet);
   //  b) unless --allow-tools, every `tool-*` row is disabled in the patch, so
   //     replayed historical tool calls cannot reach a real executor;
@@ -390,11 +420,11 @@ export async function cmdRun(opts) {
         suppressToolRows: !allowTools,
       });
       console.log(`  [e2-write] patch: disabled adapters=[${patchRes.disableIds.filter((id) => !patchRes.suppressedToolIds.includes(id)).join(',')}], suppressed tool rows=${patchRes.suppressedToolIds.length}`);
-      const budget = Number(opts.writeRounds ?? 3);
+      const budget = writeRounds;
       const candidates = cls.selected.filter((x) => fixtureBySession.has(x.sessionId));
       for (const s of candidates) {
         const tools = historyTools.get(s.sessionId) ?? [];
-        // fail-closed ALLOWLIST (audit round 3): every replayed tool must be
+        // fail-closed ALLOWLIST: every replayed tool must be
         // a known read-only builtin; mcp__*/write-class/unknown/unnamed all
         // block. Denylist semantics were fail-open for MCP & third-party.
         const clsHist = classifyHistory(tools);

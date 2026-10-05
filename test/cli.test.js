@@ -176,6 +176,82 @@ test('unknown command and bad report path exit 3', () => {
   assert.match(runCli([]).stdout, /Commands:/);
 });
 
+test('an invalid version option is an input error, not a clean-looking verdict (review round 6)', (t) => {
+  const home = buildFixture(t);
+  // measured pre-fix: `check --candidate nonsense` exited 0 with upgrade-ok —
+  // every peer comparison silently skipped, the verdict assembled from nothing
+  for (const [args, flag] of [
+    [['check', '--home', home, '--candidate', 'nonsense'], '--candidate'],
+    [['check', '--home', home, '--current', 'nonsense'], '--current'],
+  ]) {
+    const art = path.join(home, 'art-' + Math.random().toString(36).slice(2));
+    const r = runCli([...args, '--artifacts', art]);
+    assert.equal(r.status, 3, `${args.join(' ')} must exit 3, got ${r.status}: ${r.stdout}${r.stderr}`);
+    assert.ok(r.stderr.includes(`${flag} must be an exact semver version`), r.stderr);
+    assert.ok(!fs.existsSync(art), 'rejected input must not produce artifacts');
+  }
+  const run = runCli(['run', '--to', 'nonsense', '--home', home, '--artifacts', path.join(home, 'art-run')]);
+  assert.equal(run.status, 3, `run --to nonsense must exit 3, got ${run.status}`);
+  assert.match(run.stderr, /--to must be an exact semver version/);
+  assert.ok(!fs.existsSync(path.join(home, 'art-run')), 'validation precedes any artifact or network work');
+});
+
+test('clean only removes owned artifact directories (review round 6)', (t) => {
+  const parent = fs.mkdtempSync(path.join(os.homedir(), 'dsh-rehearsal-cleanguard-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const mark = (dir, content = 'dsh-rehearsal-artifact-v1') => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, '.dsh-rehearsal-owner'), content + '\n');
+  };
+
+  // an arbitrary non-empty directory is refused, and survives
+  const victim = path.join(parent, 'precious');
+  fs.mkdirSync(victim, { recursive: true });
+  fs.writeFileSync(path.join(victim, 'keep.txt'), 'x');
+  const refused = runCli(['clean', '--artifacts', victim, '--yes']);
+  assert.equal(refused.status, 3);
+  assert.match(refused.stderr, /ownership marker/);
+  assert.ok(fs.existsSync(path.join(victim, 'keep.txt')), 'unowned data survives --yes');
+
+  // a corrupt marker is not a marker
+  fs.writeFileSync(path.join(victim, '.dsh-rehearsal-owner'), 'something-else\n');
+  assert.equal(runCli(['clean', '--artifacts', victim, '--yes']).status, 3);
+  assert.ok(fs.existsSync(victim));
+
+  // a marker-bearing dir (what check/run write) is removable
+  const owned = path.join(parent, 'owned');
+  mark(owned);
+  fs.writeFileSync(path.join(owned, 'report.json'), '{}');
+  assert.equal(runCli(['clean', '--artifacts', owned, '--yes']).status, 0);
+  assert.ok(!fs.existsSync(owned));
+
+  // aggregate parent: every child carries the marker
+  const agg = path.join(parent, 'aggregate');
+  mark(path.join(agg, 'check-123'));
+  assert.equal(runCli(['clean', '--artifacts', agg, '--yes']).status, 0);
+  assert.ok(!fs.existsSync(agg));
+
+  // legacy default layout from pre-marker versions stays cleanable — the
+  // run directories carry the version in their real name
+  const legacy = path.join(parent, '.dsh-rehearsal');
+  fs.mkdirSync(path.join(legacy, 'run-0.2.0-rc.2-999'), { recursive: true });
+  assert.equal(runCli(['clean', '--artifacts', legacy, '--yes']).status, 0);
+  assert.ok(!fs.existsSync(legacy));
+
+  // a mixed parent (one owned child, one loose file) is not owned
+  const mixed = path.join(parent, 'mixed');
+  mark(path.join(mixed, 'check-1'));
+  fs.writeFileSync(path.join(mixed, 'notes.txt'), 'x');
+  assert.equal(runCli(['clean', '--artifacts', mixed, '--yes']).status, 3);
+
+  // dangerous targets are refused even with --yes
+  for (const target of [os.homedir(), '.']) {
+    const r = runCli(['clean', '--artifacts', target, '--yes']);
+    assert.equal(r.status, 3, `${target} must be refused`);
+    assert.match(r.stderr, /refuses to touch/);
+  }
+});
+
 test('--help and --version are real flags, not "unknown command" (installed-CLI contract)', () => {
   // The conventional first thing anyone types after `npm i -g` must not exit 3:
   // that code means "the rehearsal itself failed" in this tool's contract.

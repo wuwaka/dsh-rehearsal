@@ -71,7 +71,7 @@ dsh-rehearsal clean --yes                       # 清理产物
 | `--sample N` / `--full` | 限制或放开参与预演的会话数 |
 | `--skip-write` | 跳过写回合 |
 | `--keep` | 保留影子数据用于调试（内含会话明文副本） |
-| `--shadow-dir <dir>` / `--prefix-dir <dir>` | 指定影子 home / 候选安装目录；两处目录**不会自动清理**（影子 home 内含会话明文副本），`clean --yes` 只清理默认产物目录 |
+| `--shadow-dir <dir>` / `--prefix-dir <dir>` | 指定影子 home / 候选安装目录；两处目录**不会自动清理**（影子 home 内含会话明文副本），非空且无本工具 ownership 标记的目录会被拒绝写入，`clean --yes` 只清理带标记的默认产物目录 |
 | `--allow-tools` | 显式允许执行历史工具调用 |
 
 其余选项以 `dsh-rehearsal --help` 为准。
@@ -128,7 +128,7 @@ downgrade after migration is not possible; rollback relies on a pre-upgrade snap
 - 真实 home 与桌面宿主安装目录只读；发现与探测只做文件解析。
 - 形如凭据的环境变量全部剔除，遥测强制关闭。
 - 历史工具调用默认不执行（fail-closed 只读允许清单）。
-- 报告写盘前脱敏，脱敏未过则拒绝出报告；影子数据除 `--keep` 与显式 `--shadow-dir` 外一律清理，外部指定目录不归 `clean` 管。
+- 报告写盘前脱敏，脱敏未过则拒绝出报告；影子数据除 `--keep` 与显式 `--shadow-dir` 外一律清理，`clean` 只删除带 ownership 标记的产物目录。
 
 准确的保证、显式危险的选项、以及范围之外，见 [SECURITY.md](SECURITY.md)。
 

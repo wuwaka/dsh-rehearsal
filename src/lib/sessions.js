@@ -88,7 +88,7 @@ export function readHeader(file) {
  *    label them honestly.
  *  - skipped: preset (unless included), cwd missing, already-v4
  *
- * Selection stratifies (audit round 4) so preset-carrying sessions can never
+ * Selection stratifies so preset-carrying sessions can never
  * be zero-selected again: the tail-graded sampler let `--preset-mode patch`
  * claim a gate it never exercised (presets were 38/52 on a real machine).
  * But PROPORTIONAL fill was wrong too — it shrank the plain stratum from 9 to
@@ -172,7 +172,7 @@ export function encodeCwdDir(cwd) {
  * Copy the rehearsal set into the shadow home.
  * Never touches ~/.dsh/.credentials.yaml.
  *
- * SAFETY (audit P0-1): every copied generation's header `cwd` is rewritten to
+ * SAFETY: every copied generation's header `cwd` is rewritten to
  * a private sandbox directory under the shadow home, AND the copy is moved
  * into a workspace dir named by encodeCwdDir(sandbox) — the harness derives
  * the session's physical path from header.cwd, so both must change together

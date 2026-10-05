@@ -74,7 +74,7 @@ export async function installCandidate(version, prefixDir, log = () => {}, { run
   // So: find npm.cmd via `where`, derive its bundled npm-cli.js, and run it
   // with plain node. No shell, no quoting hazards.
   // Lifecycle scripts of ~500 transitive packages are denied by default
-  // (audit P2-8): the official pnpm profile allowlists only esbuild/lefthook/
+  // the official pnpm profile allowlists only esbuild/lefthook/
   // node-pty/koffi etc., so a blanket npm run is a wider execution surface
   // than the user's own profile permits. Escape hatch: runScripts=true
   // (--run-scripts) when a native dep genuinely needs its build step.
@@ -123,8 +123,8 @@ export function mountReplayPlugin(bin, shadowHome, version, log = () => {}) {
  * as a replace of an existing entry and is skipped with
  * `patch: entry "..." not found` when absent.
  *
- * SAFETY (audit P0-1 + round 3): with `suppressToolRows` (default TRUE —
- * library-level fail-open was the round-3 finding), every executor row is
+ * SAFETY: with `suppressToolRows` (default TRUE —
+ * a library-level fail-open default would be), every executor row is
  * disabled before the write round, matched by id OR by package NAME prefix:
  *   id:      ^tool- , ^terminal-
  *   name:    @deepseek-ai/dsh-tool- , -mcp- , -skill , -browser , -terminal , -jobs
@@ -230,8 +230,8 @@ export function patchAdoptionGate(prefixDir, log = () => {}) {
   // The pristine backup is bound to the installed candidate version: a
   // reused --prefix-dir across candidates would otherwise patch candidate B
   // from candidate A's backup. When the installed version cannot be read at
-  // all, do NOT guess which backup is valid — refuse the patch (review round
-  // 5, P2-4): preset sessions then skip with this reason, and the failure
+  // all, do NOT guess which backup is valid — refuse the patch: preset
+  // sessions then skip with this reason, and the failure
   // direction stays "no patch" rather than "patched from an unknown base".
   const backup = hl + '.rehearsal-orig';
   let candidateVersion = null;

@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { cmdCheck, writeArtifacts } from './commands/check.js';
 import { cmdRun } from './commands/run.js';
+import { isOwnedArtifactsDir, isDangerousTarget } from './lib/util.js';
 
 const USAGE = `dsh-rehearsal — upgrade rehearsal CLI for DeepSeek Harness (dsh)
 
@@ -39,6 +40,11 @@ Commands:
 
   report <dir> [--format json|md]
       Re-render a report directory.
+
+  clean [--artifacts <dir>] --yes
+      Remove the artifact directory. Only directories carrying this tool's
+      ownership marker (or its own legacy default layout) are ever removed;
+      --shadow-dir / --prefix-dir targets are not managed by clean.
 
 Home discovery (check/run): --home > $DSH_HOME > a validated default home
 (~/.dsh) > a validated host-catalog home (official DeepSeek Harness Desktop;
@@ -122,6 +128,18 @@ async function main() {
       if (!fs.existsSync(base)) {
         console.log('nothing to clean:', base);
         break;
+      }
+      // Deleting is only ever allowed on directories this tool created:
+      // the ownership marker (or the tool's own legacy default layout) is
+      // required, and targets where a recursive delete could take down the
+      // machine's state (home, cwd, filesystem root) are rejected outright.
+      if (isDangerousTarget(base)) {
+        console.error(`clean refuses to touch ${base}: it is the home, the working directory or a filesystem root`);
+        process.exit(3);
+      }
+      if (!isOwnedArtifactsDir(base)) {
+        console.error(`clean refuses to remove ${base}: it carries no dsh-rehearsal ownership marker (created by an earlier version, or not by this tool). Delete it manually if you are certain.`);
+        process.exit(3);
       }
       if (!opts.yes) {
         console.log('would remove:', base, '(rerun with --yes)');

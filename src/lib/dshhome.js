@@ -145,15 +145,15 @@ export function listProfiles(home) {
   return fs
     .readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
-    // profiles/node_modules is pnpm's symlink farm, not a profile (audit
-    // P2-4); dot-dirs are scratch/lock artifacts.
+    // profiles/node_modules is pnpm's symlink farm, not a profile;
+    // dot-dirs are scratch/lock artifacts.
     .filter((e) => e.name !== 'node_modules' && !e.name.startsWith('.'))
     .map((e) => e.name);
 }
 
 /**
  * Best-effort detection of the CURRENTLY RUNNING dsh runtime version
- * (audit P2-1): needed to classify peer findings as pre-existing vs newly
+ * needed to classify peer findings as pre-existing vs newly
  * broken by the candidate. Probe chain:
  *   1. the profile's node_modules (mirrors the dsh installation closure)
  *   2. profiles/node_modules beside the profiles (pnpm's shared closure)
@@ -174,7 +174,9 @@ export function detectCurrentDshVersion(home, profileName, origin) {
 /**
  * Same probe chain as detectCurrentDshVersion with provenance: every hit
  * carries { host, version, source }, and markers that exist but fail
- * validation are listed in `untrusted` instead of being silently dropped.
+ * validation are listed in `untrusted` instead of being silently dropped —
+ * for the profile-local tier such a marker also stops the chain (unknown),
+ * since machine-level bundles must not answer for the profile's own runtime.
  * When desktop hosts DISAGREE on their bundled runtime (two hosts installed,
  * one shared home — including hosts installed but never launched), "current"
  * is genuinely unknowable: version is null and `ambiguous` lists the
@@ -191,15 +193,20 @@ export function runtimeEvidence(home, profileName, origin) {
     path.join(home, 'profiles', 'node_modules', '@deepseek-ai', 'dsh', 'package.json'),
   ].filter(Boolean);
   for (const p of pkgCandidates) {
+    let raw;
     try {
-      const v = JSON.parse(fs.readFileSync(p, 'utf8')).version;
-      if (v && semverLike(v)) {
-        // tier 1 is AUTHORITATIVE for the home: the profile's own closure is
-        // the runtime that wrote these sessions, so a machine-level desktop
-        // bundle never competes with it (old first-hit behavior preserved)
-        return { version: v, sources: [{ host: 'profile-node_modules', version: v, source: 'profile-node_modules' }], ambiguous: null, untrusted: [] };
-      }
-    } catch { /* next probe */ }
+      raw = fs.readFileSync(p, 'utf8');
+    } catch (e) {
+      if (e?.code === 'ENOENT') continue; // miss: try the next candidate
+      return profileMarkerUntrusted();
+    }
+    let v;
+    try { v = JSON.parse(raw).version; } catch { v = undefined; }
+    if (!v || !semverLike(v)) return profileMarkerUntrusted();
+    // tier 1 is AUTHORITATIVE for the home: the profile's own closure is the
+    // runtime that wrote these sessions, so a machine-level desktop bundle
+    // never competes with it
+    return { version: v, sources: [{ host: 'profile-node_modules', version: v, source: 'profile-node_modules' }], ambiguous: null, untrusted: [] };
   }
 
   const scopedId = typeof origin === 'string' && origin.startsWith(DESKTOP_ORIGIN_PREFIX)
@@ -307,6 +314,23 @@ function isValidVersion(v) {
 
 function semverLike(v) {
   return isValidVersion(v);
+}
+
+/**
+ * A profile-local marker that EXISTS but cannot be used (unreadable, not
+ * JSON, or a non-semver version) stops the probe chain with current unknown:
+ * the profile closure is this home's runtime fact, and substituting
+ * machine-level evidence (a desktop bundle belonging to another install)
+ * would silently answer with the wrong version. Same rule as the desktop
+ * descriptor: untrusted never falls through.
+ */
+function profileMarkerUntrusted() {
+  return {
+    version: null,
+    sources: [],
+    ambiguous: null,
+    untrusted: [{ host: 'profile-node_modules', source: 'profile-node_modules' }],
+  };
 }
 
 /**

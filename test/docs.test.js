@@ -112,9 +112,9 @@ const CITE_RE = /([\w./-]+\.(?:js|mjs|ts|yml|yaml|json|md)):(\d+)(?:-(\d+))?/g;
 // readers to the wrong place. (report.js:136 drifted to 199 unnoticed for a
 // whole review round.)
 const CITED_LINES = [
-  ['src/lib/report.js', 210, /export function finalize\(report\)/],
-  ['src/lib/util.js', 66, /credential-shaped variable/],
-  ['src/lib/util.js', 85, /DSH_TELEMETRY_MODE = 'DISABLED'/],
+  ['src/lib/report.js', 225, /export function finalize\(report\)/],
+  ['src/lib/util.js', 71, /credential-shaped variable/],
+  ['src/lib/util.js', 90, /DSH_TELEMETRY_MODE = 'DISABLED'/],
   ['src/lib/shadow.js', 138, /TOOL_ROW_NAME_PREFIXES = \[/],
   ['src/lib/drill.js', 14, /WRITE_FAIL_SIGNATURES = \[/],
   ['src/lib/drill.js', 22, /preset-not-composed/],
@@ -128,8 +128,8 @@ const CITED_LINES = [
   ['src/commands/run.js', 21, /patch-entry-not-found/],
   ['src/commands/run.js', 22, /port-in-use/],
   ['src/commands/run.js', 23, /module-missing/],
-  ['src/commands/run.js', 261, /two cold boots/],
-  ['src/commands/run.js', 266, /MISSING_CREDENTIAL/],
+  ['src/commands/run.js', 291, /two cold boots/],
+  ['src/commands/run.js', 296, /MISSING_CREDENTIAL/],
 ];
 
 // Paths that live in somebody else's repository, each with a marker that must

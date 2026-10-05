@@ -1,6 +1,11 @@
 // Shared helpers: process spawning with strict stdout/stderr separation,
-// keyless/telemetry-safe environment, and small logging utilities.
+// keyless/telemetry-safe environment, version-option validation, directory
+// ownership markers, and small logging utilities.
 
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import semver from 'semver';
 import { spawnSync } from 'node:child_process';
 
 /**
@@ -62,7 +67,7 @@ export function run(cmd, args, { cwd, env, timeoutMs = 180000, shell = false, re
  * Environment for every candidate-dsh invocation inside a shadow home.
  *
  * Returns the COMPLETE child environment (caller must not merge with
- * process.env): the parent process is never mutated (audit P2-6), and every
+ * process.env): the parent process is never mutated, and every
  * credential-shaped variable (API_KEY / TOKEN / SECRET / CREDENTIAL /
  * PASSWORD / PRIVATE_KEY / AUTH) is stripped rather than only
  * DEEPSEEK_API_KEY. Telemetry is explicitly disabled (candidate 0.2.0
@@ -103,3 +108,91 @@ export const VERDICT = {
   SKIP: 'skip',
   INCONCLUSIVE: 'inconclusive',
 };
+
+/**
+ * Validate a version-valued CLI option (--candidate / --current / --to).
+ * Absent (undefined/null) is allowed; the caller decides requiredness.
+ * Everything else must be an exact semver string, because an unvalidated
+ * version does not fail — it silently turns the peer comparison into "not
+ * executed" and yields a clean-looking verdict (measured 2026-10-05: a
+ * `check --candidate nonsense` run exited 0 with `upgrade-ok`).
+ */
+export function validateVersionOption(value, flag) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && semver.valid(value)) return value;
+  throw new Error(`${flag} must be an exact semver version (e.g. 0.2.0-rc.2), got ${JSON.stringify(value)}`);
+}
+
+/**
+ * Ownership markers for directories this tool creates and later prunes or
+ * reuses. A directory is only written into (and only ever deleted) when it
+ * is provably ours: the marker distinguishes "an empty dir the user pointed
+ * --shadow-dir at" from "somebody's existing data that happens to sit at a
+ * path we were handed".
+ */
+const OWNER_FILE = '.dsh-rehearsal-owner';
+const OWNER_KINDS = Object.freeze({
+  artifact: 'dsh-rehearsal-artifact-v1',
+  shadow: 'dsh-rehearsal-shadow-v1',
+  prefix: 'dsh-rehearsal-prefix-v1',
+});
+
+/** The marker string inside dir, or null when absent/unreadable/unknown. */
+export function readOwner(dir) {
+  try {
+    const v = fs.readFileSync(path.join(dir, OWNER_FILE), 'utf8').trim();
+    return Object.values(OWNER_KINDS).includes(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Claim a directory for one owned kind. Missing or empty directories are
+ * adopted (marker written); a matching marker means reuse; anything else —
+ * another kind's marker, a corrupt marker, or a non-empty unmarked
+ * directory — returns false and the caller must refuse to use it.
+ */
+export function claimOwnedDir(dir, kind) {
+  const want = OWNER_KINDS[kind];
+  if (!want) throw new Error(`unknown owner kind ${JSON.stringify(kind)}`);
+  let st = null;
+  try { st = fs.statSync(dir); } catch { /* missing */ }
+  if (st && !st.isDirectory()) return false;
+  if (st) {
+    const have = readOwner(dir);
+    if (have === want) return true;
+    if (have !== null) return false; // another kind's marker
+    let entries = [];
+    try { entries = fs.readdirSync(dir); } catch { return false; }
+    if (entries.length) return false; // non-empty and unmarked: not ours
+  } else {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(dir, OWNER_FILE), want + '\n');
+  return true;
+}
+
+/**
+ * True when `clean` may delete dir: it carries the artifact marker itself,
+ * every immediate child directory carries it (the default .dsh-rehearsal
+ * parent), or it is the tool's own default layout from before markers
+ * existed — name `.dsh-rehearsal` with only its own generated children
+ * (`check-<ts>`, `run-<version>-<ts>`).
+ */
+export function isOwnedArtifactsDir(dir) {
+  if (readOwner(dir) === OWNER_KINDS.artifact) return true;
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return false; }
+  if (!entries.length) return false;
+  const marked = (p) => readOwner(p) === OWNER_KINDS.artifact;
+  if (entries.every((e) => e.isDirectory() && marked(path.join(dir, e.name)))) return true;
+  return path.basename(path.resolve(dir)) === '.dsh-rehearsal'
+    && entries.every((e) => e.isDirectory() && /^(check|run)-[\w.-]+$/.test(e.name));
+}
+
+/** Refuse targets where a recursive delete could take down the machine's state. */
+export function isDangerousTarget(dir) {
+  const resolved = path.resolve(dir);
+  return [path.parse(resolved).root, os.homedir(), process.cwd()].includes(resolved);
+}

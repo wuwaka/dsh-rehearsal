@@ -115,6 +115,20 @@ test('P1-2: finalize deep-scrubs evidence objects; report JSON has no abs paths/
   assert.ok(json.includes('~'), 'home dirs are masked');
 });
 
+test('single-segment POSIX absolutes are scrubbed; URLs and prose survive (round 6)', () => {
+  // the multi-segment rule never matched `/tmp` or `/etc`, while SECURITY
+  // promises "any POSIX absolute path"
+  assert.equal(scrubText('see /tmp for output'), 'see <abs-path> for output');
+  assert.equal(scrubText('x=/etc; y'), 'x=<abs-path>; y');
+  assert.equal(scrubText('go to /root now'), 'go to <abs-path> now');
+  // and the rule must not eat legitimate text
+  assert.equal(scrubText('site=//github.com/x'), 'site=//github.com/x');
+  assert.equal(scrubText('and/or'), 'and/or');
+  assert.equal(scrubText('ratio 50/50'), 'ratio 50/50');
+  assert.equal(scrubText('url=https://github.com/wuwaka/dsh-rehearsal'), 'url=https://github.com/wuwaka/dsh-rehearsal');
+  assert.equal(scrubText('shape=sessions/<ws>/<id>/session.v4.jsonl.zstd'), 'shape=sessions/<ws>/<id>/session.v4.jsonl.zstd');
+});
+
 test('scrubText redacts paths containing SPACES without leaking the tail', () => {
   // Regression: `[^\s"']*` stopped at the first space, so only the leading
   // segments were masked and the rest of the path survived in the report.
@@ -281,6 +295,8 @@ test('an unknown path shape marks the report unscrubbed and writeReport refuses 
   finalize(r);
   assert.ok(r.warnings.some((w) => /redaction gap/.test(w)), 'the invariant must flag what the filter missed');
   assert.equal(r.privacy.scrubbed, false, 'an unmet invariant must not claim scrubbed');
+  assert.equal(r.privacy.redactionGapCount, 1, 'the structured gap count says how many tokens survived');
+  assert.ok(!r.warnings.join('\n').includes('dsh-shadow-1'), 'the leaked token itself must never be echoed into the report');
   // fail-closed: the earlier behaviour warned and wrote the leak anyway
   assert.throws(() => writeReport(dir, r), /refusing to write an unsanitised report/, 'writeReport must refuse');
   assert.equal(fs.existsSync(path_module.join(dir, 'report.json')), false, 'nothing may reach disk');

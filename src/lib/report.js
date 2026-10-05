@@ -57,7 +57,11 @@ export function newReport({ candidateVersion, profile, command }) {
       // Set by finalize(), not at construction: a report that never reached
       // finalize() must not claim it was scrubbed.
       scrubbed: false,
-      // Honest capability statement (audit P1-1): reports never carry message
+      // Set by finalize(): how many path-shaped tokens the invariant could
+      // not mask. Structured state feeding the warning text, instead of the
+      // warning text being the only record.
+      redactionGapCount: null,
+      // Honest capability statement: reports never carry message
       // bodies; stderr evidence is filtered to diagnostic lines only, and
       // messages are never read by the tool itself (session bodies are only
       // ever byte-scanned for poison-row counts, never stored or echoed).
@@ -110,6 +114,11 @@ export function finalizeVerdict(report) {
  */
 const FIELD = '[^"\'`,;|\\n\\r]*';
 const BOUND = '(^|[\\s=("\'`:;])';
+// One path segment / the delimiter set a path field ends at — shared by the
+// single-segment POSIX rule in scrubText and its invariant counterpart in
+// findPathShapes, so the two can never drift apart.
+const SEG = '[A-Za-z0-9._~-]+';
+const END = "(?=$|[\\s\"'`,;|])";
 
 export function scrubText(s) {
   let out = String(s);
@@ -129,6 +138,11 @@ export function scrubText(s) {
   // `<abs-path> b\c.log`. Consume to the end of the field instead.
   out = out.replace(new RegExp(`\\b[A-Za-z]:[\\\\/]${FIELD}`, 'g'), '<abs-path>');
   out = out.replace(new RegExp(`${BOUND}\\/(?:[^\\/"'\`,;|\\n\\r]+\\/)${FIELD}`, 'g'), '$1<abs-path>');
+  // Single-segment POSIX absolutes (`/tmp`, `/etc`): the rule above requires
+  // a second segment, while the security promise is "any POSIX absolute
+  // path". The lookahead keeps `//host` URLs and repo-relative text (`a/b`)
+  // untouched.
+  out = out.replace(new RegExp(`${BOUND}\\/(?![\\/])${SEG}${END}`, 'g'), '$1<abs-path>');
   out = out.replace(new RegExp(`${BOUND}\\\\\\\\${FIELD}`, 'g'), '$1<unc-path>');
   out = out.replace(new RegExp(`${BOUND}\\.\\.[\\\\/]${FIELD}`, 'g'), '$1<rel-path>');
   out = out.replace(/sk-[A-Za-z0-9_-]{8,}/g, 'sk-[redacted]');
@@ -142,8 +156,9 @@ export function findPathShapes(text) {
   const pats = [
     /\b[A-Za-z]:[\\/]/g,
     /(^|[\s=("'`:;])\/(?:[^/"'`,;|\n\r]+\/)/g,
+    new RegExp(`${BOUND}\\/(?![\\/])${SEG}${END}`, 'g'),
     /(^|[\s=("'`:;])\\\\/g,
-    /(^|[\s=("'`:;])\.\.[\\/]/g,
+    /(^|[\s=("'`:;])\.[\\/]/g,
   ];
   const hits = [];
   for (const p of pats) for (const m of t.matchAll(p)) hits.push(m[0].trim());
@@ -213,18 +228,19 @@ export function finalize(report) {
   if (report.coverage) report.coverage = scrubValue(report.coverage);
   if (report.target) report.target = scrubValue(report.target);
   if (Array.isArray(report.warnings)) report.warnings = report.warnings.map((w) => scrubText(w));
-  // Invariant rather than a filter: the rules above know the shapes seen so far,
-  // and a later stage can compose one they do not. Surviving path-shaped text
-  // marks the report unscrubbed; writeReport() then REFUSES to publish it —
-  // an invariant that only warns still ships the leak it detected.
-  const scanned = JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k !== 'warnings')));
-  const leftover = [...new Set(findPathShapes(scanned))];
+  // Invariant over the WHOLE report — warnings included, no exclusion: after
+  // scrubbing they carry no path shapes, and the gap warning added below is
+  // count-only precisely so it can never self-trigger. Surviving path-shaped
+  // text marks the report unscrubbed; writeReport() then REFUSES to publish it.
+  const leftover = [...new Set(findPathShapes(JSON.stringify(report)))];
   if (!report.privacy) report.privacy = {};
+  report.privacy.redactionGapCount = leftover.length;
   if (leftover.length) {
     if (!Array.isArray(report.warnings)) report.warnings = [];
-    report.warnings.push(`redaction gap: ${leftover.length} path-shaped token(s) survived scrubbing (e.g. ${leftover.slice(0, 3).join(', ')}) — treat this report as unsanitised until scrubText learns the shape`);
-    // "scrubbed" means covered, not "the function ran". A report that failed the
-    // invariant says so, rather than carrying a promise it did not keep.
+    // the offending tokens are deliberately NOT echoed — they are the leak
+    report.warnings.push(`redaction gap: ${leftover.length} path-shaped token(s) survived scrubbing — treat this report as unsanitised until scrubText learns the shape`);
+    // "scrubbed" means covered, not "the function ran". A report that failed
+    // the invariant says so, rather than carrying a promise it did not keep.
     report.privacy.scrubbed = false;
   } else {
     report.privacy.scrubbed = true;
@@ -242,7 +258,7 @@ export function finalize(report) {
  * `true` (measured 2026-10-05: a path injected after finalize shipped
  * verbatim).
  *
- * Fail-closed (review round 5, P1-2): when the invariant still finds
+ * Fail-closed: when the invariant still finds
  * path-shaped text after scrubbing, the report is NOT written at all. The
  * earlier behaviour warned and wrote anyway, which contradicted the promise
  * that reports are sanitised before they reach disk — a warning next to
@@ -251,8 +267,8 @@ export function finalize(report) {
 export function writeReport(dir, report) {
   const done = finalize(report);
   if (done.privacy.scrubbed !== true) {
-    const gaps = (done.warnings ?? []).filter((w) => /redaction gap/.test(w)).length;
-    throw new Error(`refusing to write an unsanitised report (${gaps} redaction gap warning(s); the offending tokens are listed in the in-memory report only)`);
+    const n = done.privacy.redactionGapCount ?? 0;
+    throw new Error(`refusing to write an unsanitised report (${n} path-shaped token(s) survived scrubbing; the tokens themselves are never echoed)`);
   }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'report.json'), JSON.stringify(done, null, 2));

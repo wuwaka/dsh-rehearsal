@@ -27,6 +27,7 @@
   ```
 
 - 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。`dsh-rehearsal@0.2.1` 起已在 registry（2026-10-03）；npm 前端的实际渲染截至 2026-10-05 仍未复核（npmjs.com 对脚本请求返回 403，需要浏览器人工看一眼）。
+- npm 包的文件边界由 `package.json` 的 `files` 决定：用户文档随包（README 双语、SECURITY 双语、CHANGELOG 双语、docs/、src/），维护者文档（AUDIT、PUBLISHING、内部方案文档）不随包；`test/pack.test.js` 双向锁定这条边界。README 里的相互链接在 GitHub 上解析，npm 页面不是文档入口。
 
 ## 文档治理
 

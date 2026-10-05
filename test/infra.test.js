@@ -8,8 +8,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { countRows, simpleListAfter } from '../src/lib/yaml-lite.js';
-import { listProfiles, detectCurrentDshVersion } from '../src/lib/dshhome.js';
-import { shadowEnv, redactedEnvNames } from '../src/lib/util.js';
+import { listProfiles, detectCurrentDshVersion, runtimeEvidence } from '../src/lib/dshhome.js';
+import { shadowEnv, redactedEnvNames, claimOwnedDir, readOwner, isOwnedArtifactsDir } from '../src/lib/util.js';
 import { patchAdoptionGate } from '../src/lib/shadow.js';
 
 const DESKTOP_LIKE = `- id: desktop-shell
@@ -84,16 +84,84 @@ test('detectCurrentDshVersion prefers the profile-scoped install over machine pr
   fs.writeFileSync(path.join(dshPkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.2.0-rc.2' }));
   assert.equal(detectCurrentDshVersion(home, 'web'), '0.2.0-rc.2');
 
-  // garbage is never reported as a version — callers must see null and treat
-  // it as "unknown", never as "matches the candidate"
+  // a marker that EXISTS but is unusable is untrusted: current resolves to
+  // null and the chain STOPS — machine-level bundles (a desktop install that
+  // may belong to another host) must never answer for the profile's own
+  // runtime. The old fall-through let a broken profile marker be silently
+  // replaced by whatever version the machine happened to carry.
   fs.writeFileSync(path.join(dshPkg, 'package.json'), '{ not json');
-  const asText = detectCurrentDshVersion(home, 'web');
-  assert.ok(asText === null || /^\d+\.\d+\.\d+/.test(asText), `unexpected: ${asText}`);
+  assert.equal(detectCurrentDshVersion(home, 'web'), null, 'unreadable profile marker must not fall through');
   fs.writeFileSync(path.join(dshPkg, 'package.json'), JSON.stringify({ version: 'nightly-build' }));
-  const asJunk = detectCurrentDshVersion(home, 'web');
-  assert.ok(asJunk === null || /^\d+\.\d+\.\d+/.test(asJunk), `non-semver leaked: ${asJunk}`);
+  assert.equal(detectCurrentDshVersion(home, 'web'), null, 'non-semver profile marker must not fall through');
+  const ev = runtimeEvidence(home, 'web', undefined);
+  assert.equal(ev.version, null);
+  assert.equal(ev.sources.length, 0);
+  assert.equal(ev.untrusted.length, 1, 'the untrusted marker is provenance, not silence');
+  assert.equal(ev.untrusted[0].host, 'profile-node_modules');
 
   assert.equal(detectCurrentDshVersion(home, undefined), detectCurrentDshVersion(home, null), 'missing profile name must not throw');
+});
+
+test('claimOwnedDir adopts empty dirs, reuses its own marker, refuses foreign content (round 6)', (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dshr-own-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+
+  const fresh = path.join(base, 'fresh');
+  assert.equal(claimOwnedDir(fresh, 'shadow'), true);
+  assert.equal(readOwner(fresh), 'dsh-rehearsal-shadow-v1');
+  assert.equal(claimOwnedDir(fresh, 'shadow'), true, 'same kind reuses its marker');
+  assert.equal(claimOwnedDir(fresh, 'prefix'), false, 'another kind must not take over');
+
+  const empty = path.join(base, 'empty');
+  fs.mkdirSync(empty);
+  assert.equal(claimOwnedDir(empty, 'prefix'), true, 'an empty existing dir is adoptable');
+
+  const full = path.join(base, 'full');
+  fs.mkdirSync(full);
+  fs.writeFileSync(path.join(full, 'x.txt'), 'x');
+  assert.equal(claimOwnedDir(full, 'shadow'), false, 'non-empty unmarked dirs are refused');
+  assert.equal(readOwner(full), null, 'a refused dir is left exactly as found');
+
+  assert.throws(() => claimOwnedDir(path.join(base, 'no-such-kind'), 'bogus'), /unknown owner kind/);
+});
+
+test('isOwnedArtifactsDir: markers, aggregate parents, legacy layout, refusals (round 6)', (t) => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'dshr-owned2-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const mark = (dir) => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, '.dsh-rehearsal-owner'), 'dsh-rehearsal-artifact-v1\n');
+  };
+
+  const own = path.join(base, 'own');
+  mark(own);
+  assert.equal(isOwnedArtifactsDir(own), true);
+
+  const agg = path.join(base, 'agg');
+  mark(path.join(agg, 'check-1'));
+  assert.equal(isOwnedArtifactsDir(agg), true, 'every child marked');
+
+  const mixed = path.join(base, 'mixed');
+  mark(path.join(mixed, 'check-1'));
+  fs.writeFileSync(path.join(mixed, 'loose.txt'), 'x');
+  assert.equal(isOwnedArtifactsDir(mixed), false, 'a loose file disqualifies the parent');
+
+  const legacy = path.join(base, '.dsh-rehearsal');
+  fs.mkdirSync(path.join(legacy, 'run-0.2.0-rc.2-1790945328460'), { recursive: true });
+  fs.mkdirSync(path.join(legacy, 'check-1791188357615'), { recursive: true });
+  assert.equal(isOwnedArtifactsDir(legacy), true, 'pre-marker default layout stays cleanable (real check-/run- naming)');
+
+  const wrongName = path.join(base, 'elsewhere');
+  fs.mkdirSync(path.join(wrongName, 'check-9'), { recursive: true });
+  assert.equal(isOwnedArtifactsDir(wrongName), false, 'the legacy fallback is scoped to the tool default name');
+
+  const corrupt = path.join(base, 'corrupt');
+  fs.mkdirSync(corrupt);
+  fs.writeFileSync(path.join(corrupt, '.dsh-rehearsal-owner'), 'garbage\n');
+  fs.mkdirSync(path.join(corrupt, 'check-1'));
+  assert.equal(isOwnedArtifactsDir(corrupt), false, 'a corrupt marker is not a marker');
+
+  assert.equal(isOwnedArtifactsDir(path.join(base, 'absent')), false);
 });
 
 test('P2-6: patchAdoptionGate re-seeds its backup when the candidate version changes', (t) => {

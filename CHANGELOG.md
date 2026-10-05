@@ -11,6 +11,25 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+### Fixed
+
+- Version-valued options are validated at the command boundary (`--candidate`, `--current`, `--to`): measured, `check --candidate nonsense` used to exit 0 with `upgrade-ok` — the comparison never ran and the verdict was assembled from nothing. An invalid version now fails with a readable error (exit 3) before any install or artifact write.
+- `clean` gained ownership and dangerous-path guards: it removes only artifact directories bearing this tool's marker (or the pre-marker default layout); arbitrary directories, the home, the working directory and filesystem roots are refused even with `--yes`.
+- Profile-local runtime markers follow the same three-state rule as desktop descriptors: a marker that exists but is unusable (corrupt, non-semver) resolves to `untrusted` and current stays unknown — it no longer falls through to a machine-level bundle answering with another install's version.
+- `--writeRounds` and `--preset-mode` are validated (positive integer / `skip|patch`): a non-numeric budget used to become NaN, which disabled the cap and let the write round run unbounded; an unknown mode used to fall through to the default silently.
+- The redaction invariant is structured: `privacy.redactionGapCount` records the surviving-token count, the scan now covers every field (warnings included), and the gap warning no longer echoes the leaked tokens themselves.
+- Single-segment POSIX absolutes (`/tmp`, `/etc`) are scrubbed and invariant-checked; "any POSIX absolute path" now holds literally.
+- `--shadow-dir` / `--prefix-dir` require ownership before anything is written: empty directories are adopted and marked, non-empty unmarked directories are refused.
+
+### Added
+
+- An npm-tarball boundary test (`test/pack.test.js`): user documentation ships with the package (SECURITY included, both languages), maintainer documents (AUDIT, PUBLISHING, internal plans) are pinned out.
+- `dsh-rehearsal --help` now lists the `clean` command and its ownership behaviour.
+
+### Changed
+
+- Production comments state why a rule must hold instead of which review round introduced it; the audit trail lives in AUDIT.md and this changelog. Regression locks: test count 117 → 125.
+
 ## [0.3.11] - 2026-10-05
 
 ### Fixed

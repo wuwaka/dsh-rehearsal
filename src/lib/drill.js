@@ -74,7 +74,7 @@ export function readIntegrity(genPath) {
     if (r.type) counters[r.type] = (counters[r.type] || 0) + 1;
     if (r.type === 'turn/start') openTurns++;
     if (r.type === 'turn/end') {
-      // bidirectional balance (audit P2-2): a stray turn/end without an open
+      // bidirectional balance: a stray turn/end without an open
       // turn is a corruption signal, not something to clamp away.
       if (openTurns === 0) issues.push({ line: 0, error: 'stray turn/end with no open turn' });
       else openTurns--;
@@ -180,7 +180,7 @@ export const WRITE_CLASS_TOOLS = new Set([
 ]);
 
 /**
- * Known read-only tools (fail-closed allowlist, audit round 3): a history
+ * Known read-only tools (fail-closed allowlist): a history
  * is drillable only when EVERY tool it would replay is in this set. Anything
  * unknown — third-party (memory/dtodo/compress), MCP (mcp__* prefix), or
  * unnamed — blocks the write round. Ground-truth census of the local library:
@@ -228,7 +228,7 @@ export function classifyToolResults(rows) {
 }
 
 /**
- * Shared diagnostic-line predicate (audit round 3: sanitizeStderr and
+ * Shared diagnostic-line predicate (sanitizeStderr and
  * firstDiagnostic previously had DIVERGENT rules — one kept a line the other
  * dropped). Kept prefixes only:
  *  - `dsh:` diagnostics EXCEPT the `dsh: reasoning:` marker (no end anchor:
@@ -236,7 +236,7 @@ export function classifyToolResults(rows) {
  *  - error class lines
  *  - llm-replay / patch: diagnostics
  *  - `file://` / `node:internal` stack evidence
- * Dropped by design (round-3 leak paths): bare `at ` (English prose often
+ * Dropped by design — the shapes that leaked prose before: bare `at ` (English prose often
  * starts "at the …"), bare `fail…` prefixes ("failure to parse …"), and
  * anything else — including all replayed assistant prose.
  */
@@ -245,14 +245,14 @@ export function isDiagnostic(line) {
   if (/^dsh:\s*reasoning:/i.test(l)) return false;
   // Stack frames: `at …` lines are kept ONLY when they carry real frame
   // evidence (file:// / node: / path:line:col). Bare `at the beginning …`
-  // prose dies — that was a round-3 leak path.
+  // prose dies — this shape leaked prose before.
   if (/^at\s/.test(l)) return /file:\/\/|node:|:\d+:\d+/.test(l);
   return /^(dsh:\s|Error\b|TypeError|ReferenceError|RangeError|SyntaxError|llm-replay|patch:|file:\/\/|node:internal)/.test(l);
 }
 
 /**
  * First DIAGNOSTIC headline of a stderr, or undefined for prose-only output.
- * Shares isDiagnostic with sanitizeStderr (round-3 consistency) but skips
+ * Shares isDiagnostic with sanitizeStderr (kept consistent) but skips
  * `at …` frames — a stack line is evidence, not the error's headline.
  */
 export function firstDiagnostic(stderr) {
@@ -265,7 +265,7 @@ export function firstDiagnostic(stderr) {
 }
 
 /**
- * Sanitize a child process stderr for report evidence (audit P1-1): keep
+ * Sanitize a child process stderr for report evidence: keep
  * only isDiagnostic() lines and DROP everything else (headless echoes
  * replayed reasoning/prose to stderr, which must never reach a report).
  * Returns a compact summary plus the dropped-line count so the report can

@@ -11,11 +11,12 @@ The properties below are enforced in code and covered by tests. A report that an
 | Guarantee | Where |
 |---|---|
 | The real home and desktop install directories are read-only: home discovery, session discovery and version probing only parse files; every write lands in the shadow home or the `.dsh-rehearsal` artifact directory | `src/lib/dshhome.js`, `src/lib/desktops.js` |
+| Deletion and writes carry an ownership boundary: `clean` only removes artifact directories bearing this tool's marker (the home, the working directory and filesystem roots are refused outright); `--shadow-dir` / `--prefix-dir` are refused when non-empty and unmarked | `src/lib/util.js`, `src/cli.js` |
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:66-85` |
-| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:85` |
-| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings; a scrub that fails the invariant makes `writeReport()` refuse to write | `src/lib/report.js:210`; a separate test greps the finished report for home paths and reasoning markers |
+| No credential-shaped environment variable reaches a child process; only the stripped variable names are recorded | `src/lib/util.js:71-90` |
+| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:90` |
+| Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings; a scrub that fails the invariant makes `writeReport()` refuse to write | `src/lib/report.js:225`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
 | The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
 
@@ -35,7 +36,7 @@ The failure direction of the tool-suppression list (`src/lib/shadow.js:138`) is 
 
 `report.json` and `report.md` derive from local session data. Redaction is a filter, not a proof: do not paste report files or `run` output into a public issue. Both files stay on disk; this tool uploads nothing.
 
-Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse to `~` (a home field containing spaces escalates to `<abs-path>` as a whole, leaving no tail); any drive-rooted path, any POSIX absolute path (including `/root/.dsh`, `/var/lib/<service>`, `/srv/<team>` and `/tmp/<shadow>`), any UNC share `\\server\share\…` and any parent-relative `../` collapse to `<abs-path>` / `<unc-path>` / `<rel-path>`. Repository-relative text (`src/lib/drill.js:217`, `sessions/<ws>/…`) and URLs are preserved on purpose, each with a test pinning it.
+Shapes the filter covers: `C:\Users\<n>`, `/home/<n>` and `/Users/<n>` collapse to `~` (a home field containing spaces escalates to `<abs-path>` as a whole, leaving no tail); any drive-rooted path, any POSIX absolute path (including `/root/.dsh`, `/var/lib/<service>`, `/srv/<team>`, `/tmp/<shadow>`, and single-segment ones like `/tmp` and `/etc`), any UNC share `\\server\share\…` and any parent-relative `../` collapse to `<abs-path>` / `<unc-path>` / `<rel-path>`. Repository-relative text (`src/lib/drill.js:217`, `sessions/<ws>/…`) and URLs are preserved on purpose, each with a test pinning it.
 
 Two structural guarantees rather than more regexes:
 

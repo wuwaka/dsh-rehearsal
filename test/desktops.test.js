@@ -18,6 +18,7 @@ import { readAsarFile } from '../src/lib/asar.js';
 import { homeShape } from '../src/lib/report.js';
 import { cmdCheck } from '../src/commands/check.js';
 import { cmdRun, desktopAmbiguityGate, desktopDataContext } from '../src/commands/run.js';
+import { readOwner } from '../src/lib/util.js';
 
 const CLI = path.join(import.meta.dirname, '..', 'src', 'cli.js');
 const FIXTURE_ASAR = path.join(import.meta.dirname, 'fixtures', 'official-desktop.asar');
@@ -540,8 +541,53 @@ test('T7 untrusted markers reach the report evidence through check (round 5 P2-1
   });
 });
 
-// ---- T8: desktop scoping ----
+test('T9 run validates option values before any work (round 6)', async (t) => {
+  const dir = envSandbox(t);
+  await assert.rejects(
+    cmdRun({ to: '0.2.0-rc.2', writeRounds: 'abc', artifacts: path.join(dir, 'a1') }),
+    /--writeRounds must be a positive integer/,
+  );
+  await assert.rejects(
+    cmdRun({ to: '0.2.0-rc.2', writeRounds: '0', artifacts: path.join(dir, 'a2') }),
+    /--writeRounds must be a positive integer/,
+  );
+  await assert.rejects(
+    cmdRun({ to: '0.2.0-rc.2', presetMode: 'patchy', artifacts: path.join(dir, 'a3') }),
+    /--preset-mode must be skip or patch/,
+  );
+  await assert.rejects(
+    cmdRun({ to: 'nonsense', artifacts: path.join(dir, 'a4') }),
+    /--to must be an exact semver version/,
+  );
+  for (const a of ['a1', 'a2', 'a3', 'a4']) {
+    assert.equal(fs.existsSync(path.join(dir, a)), false, `rejected input must not create ${a}`);
+  }
+});
 
+test('T9 run refuses a non-empty unowned --shadow-dir / --prefix-dir (round 6)', async (t) => {
+  const dir = envSandbox(t);
+  makeProfile(path.join(dir, '.dsh'));
+  const foreignShadow = path.join(dir, 'foreign-shadow');
+  fs.mkdirSync(foreignShadow, { recursive: true });
+  fs.writeFileSync(path.join(foreignShadow, 'user-data.txt'), 'x');
+  await assert.rejects(
+    cmdRun({ to: '0.2.0-rc.2', shadowDir: foreignShadow, artifacts: path.join(dir, 'art1') }),
+    /dsh-rehearsal ownership marker/,
+  );
+  assert.ok(fs.existsSync(path.join(foreignShadow, 'user-data.txt')), 'foreign data is untouched');
+  assert.equal(readOwner(foreignShadow), null, 'a refused dir never gains a marker');
+
+  const foreignPrefix = path.join(dir, 'foreign-prefix');
+  fs.mkdirSync(foreignPrefix, { recursive: true });
+  fs.writeFileSync(path.join(foreignPrefix, 'user-data.txt'), 'x');
+  await assert.rejects(
+    cmdRun({ to: '0.2.0-rc.2', prefixDir: foreignPrefix, artifacts: path.join(dir, 'art2') }),
+    /dsh-rehearsal ownership marker/,
+  );
+  assert.ok(fs.existsSync(path.join(foreignPrefix, 'user-data.txt')));
+});
+
+// ---- T8: desktop scoping ----
 test('T8 desktopDataContext: scoping, honesty fields and warning wording', () => {
   const plain = desktopDataContext('default', 'web', '0.2.0-rc.2');
   assert.equal(plain.scoped, false);

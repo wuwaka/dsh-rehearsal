@@ -19,7 +19,7 @@ import semver from 'semver';
  *   ''/blank   → unconstrained, npm treats an empty range as `*`
  *   string     → semver.validRange decides
  *   anything else (null, number, object) → a manifest schema error, and must
- *   NOT read as "no constraint" (review round 5, P2-2)
+ *   NOT read as "no constraint"
  */
 function rangeInvalidKind(range) {
   if (range === undefined) return null;
@@ -39,7 +39,7 @@ export function analyzePeerGraph(plugins, { candidate, current } = {}) {
   for (const p of plugins) {
     for (const [peer, range] of Object.entries(p.peers ?? {})) {
       // 1) plugin -> dsh core. Severity distinguishes what THIS upgrade
-      //    breaks from what is already broken today (audit P2-1): reporting
+      //    breaks from what is already broken today: reporting
       //    a pre-existing mismatch as a blocking upgrade verdict cries wolf.
       if (peer === '@deepseek-ai/dsh' || peer.startsWith('@deepseek-ai/dsh-')) {
         // A range that cannot be evaluated is a VISIBLE warn-level finding of

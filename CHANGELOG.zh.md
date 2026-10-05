@@ -9,6 +9,25 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 版本参数在命令边界校验（`--candidate`/`--current`/`--to`）：实测 `check --candidate nonsense` 曾以 exit 0、`upgrade-ok` 收场——比较根本没执行，结论从零拼出；现在非法版本直接报错（exit 3），且发生在任何安装与产物写入之前。
+- `clean` 增加 ownership 与危险路径守卫：只删除带本工具标记的产物目录（或旧版默认布局）；任意目录、HOME、工作目录、文件系统根即便带 `--yes` 也一律拒绝。
+- profile-local 运行时标记与桌面描述符同规则三态：存在但不可用（损坏、非 semver）记 `untrusted`、current 保持未知——不再回落到机器级 bundle 以另一套安装的版本作答。
+- `--writeRounds` 与 `--preset-mode` 严格校验（正整数 / `skip|patch`）：非数字预算曾变成 NaN 使上限失效、写回合无界执行；未知模式值曾静默落入默认。
+- 脱敏 invariant 结构化：`privacy.redactionGapCount` 记录漏网数，扫描覆盖全部字段（含 warnings），gap 警告不再回显泄漏的 token 本身。
+- 单段 POSIX 绝对路径（`/tmp`、`/etc`）纳入脱敏与 invariant 检查；“任意 POSIX 绝对路径”现在字面成立。
+- `--shadow-dir`/`--prefix-dir` 写入前需 ownership：空目录接管并标记，非空且无标记的目录拒绝使用。
+
+### 新增
+
+- npm tarball 边界测试（`test/pack.test.js`）：用户文档随包（SECURITY 双语在内），维护者文档（AUDIT、PUBLISHING、内部方案）被明确排除。
+- `dsh-rehearsal --help` 现在列出 `clean` 命令及其 ownership 行为。
+
+### 变更
+
+- 生产代码注释改为陈述“为什么必须如此”，不再记录改动出自哪一轮评审；审计轨迹留在 AUDIT.md 与本文件。回归锁：测试数 117 → 125。
+
 ## [0.3.11] - 2026-10-05
 
 ### 修复
