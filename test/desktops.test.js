@@ -309,115 +309,131 @@ test('T5 malformed archives are misses, not exceptions (truncated header, broken
 });
 
 // ---- T6/T7: version probes ----
+//
+// These fixtures live at the MEASURED win32 install paths, so the probes
+// run under a win32 platform override — before the platform gate was fixed,
+// CI only "passed" on macOS/Linux because the gate was dead code and every
+// platform probed every path. The gate is real now; the override is the
+// honest way to exercise the win32 layout off-Windows.
 
-test('T6 official bundle: desktop-runtime.json feeds the version through the catalog', (t) => {
+const withWin32 = (localAppData, fn) => withPlatform('win32', { LOCALAPPDATA: localAppData }, fn);
+
+test('T6 official bundle: desktop-runtime.json feeds the version through the catalog', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
-  const e = runtimeEvidence(path.join(dir, 'no-profile-home'), 'web', undefined);
-  const hit = e.sources.find((s) => s.host === 'deepseek-harness-desktop');
-  assert.ok(hit, 'official bundle detected');
-  assert.equal(hit.version, '0.2.0-rc.2');
-  assert.equal(hit.source, 'desktop-runtime.json');
-  assert.equal(e.version, '0.2.0-rc.2');
-  assert.equal(e.ambiguous, null);
+  await withWin32(dir, async () => {
+    installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
+    const e = runtimeEvidence(path.join(dir, 'no-profile-home'), 'web', undefined);
+    const hit = e.sources.find((s) => s.host === 'deepseek-harness-desktop');
+    assert.ok(hit, 'official bundle detected');
+    assert.equal(hit.version, '0.2.0-rc.2');
+    assert.equal(hit.source, 'desktop-runtime.json');
+    assert.equal(e.version, '0.2.0-rc.2');
+    assert.equal(e.ambiguous, null);
+  });
 });
 
-test('T6 anywhere-labs plain bundle path (the old hardcoded probe, now catalogued and labelled)', (t) => {
+test('T6 anywhere-labs plain bundle path (the old hardcoded probe, now catalogued and labelled)', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installCommunity(dir, '0.2.0-rc.2');
-  const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
-  const hit = e.sources.find((s) => s.host === 'dsh-desktop-anywhere-labs');
-  assert.equal(hit?.version, '0.2.0-rc.2');
-  assert.equal(hit?.source, 'package.json');
+  await withWin32(dir, async () => {
+    installCommunity(dir, '0.2.0-rc.2');
+    const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
+    const hit = e.sources.find((s) => s.host === 'dsh-desktop-anywhere-labs');
+    assert.equal(hit?.version, '0.2.0-rc.2');
+    assert.equal(hit?.source, 'package.json');
+  });
 });
 
-test('T6 non-semver versions are never reported as a runtime version', (t) => {
+test('T6 non-semver versions are never reported as a runtime version', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installCommunity(dir, 'nightly-build');
-  assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null);
+  await withWin32(dir, async () => {
+    installCommunity(dir, 'nightly-build');
+    assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null);
+  });
 });
 
-test('T6 descriptor integrity: object-shaped sharedPackages and schema drift are misses (A1/A2)', (t) => {
+test('T6 descriptor integrity: object-shaped sharedPackages and schema drift are misses (A1/A2)', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  const objShaped = buildMiniAsar([{
-    path: 'dsh/desktop-runtime.json',
-    data: Buffer.from(JSON.stringify({
-      schemaVersion: 1,
-      release: { version: '1.0.0' },
-      sharedPackages: { '@deepseek-ai/dsh': { name: '@deepseek-ai/dsh', version: '1.0.0' } },
-    })),
-  }]);
-  installOfficial(dir, objShaped);
-  assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null, 'object-shaped descriptor must never yield a version');
-  installOfficial(dir, buildMiniAsar([{
-    path: 'dsh/desktop-runtime.json',
-    data: Buffer.from(JSON.stringify({ schemaVersion: 2, release: { version: '1.0.0' }, sharedPackages: [] })),
-  }]));
-  assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null, 'schemaVersion != 1 is not trusted');
+  await withWin32(dir, async () => {
+    const objShaped = buildMiniAsar([{
+      path: 'dsh/desktop-runtime.json',
+      data: Buffer.from(JSON.stringify({
+        schemaVersion: 1,
+        release: { version: '1.0.0' },
+        sharedPackages: { '@deepseek-ai/dsh': { name: '@deepseek-ai/dsh', version: '1.0.0' } },
+      })),
+    }]);
+    installOfficial(dir, objShaped);
+    assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null, 'object-shaped descriptor must never yield a version');
+    installOfficial(dir, buildMiniAsar([{
+      path: 'dsh/desktop-runtime.json',
+      data: Buffer.from(JSON.stringify({ schemaVersion: 2, release: { version: '1.0.0' }, sharedPackages: [] })),
+    }]));
+    assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, null, 'schemaVersion != 1 is not trusted');
+  });
 });
 
-test('T7 a desktop:<id> origin only trusts its own host bundles', (t) => {
+test('T7 a desktop:<id> origin only trusts its own host bundles', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
-  const e = runtimeEvidence(path.join(dir, 'h'), 'web', 'desktop:dshdesktop-dataelement');
-  assert.equal(e.version, null, 'dataelement owns no probes; the machine-level official bundle must be ignored');
-  assert.equal(e.sources.length, 0);
-  const e2 = runtimeEvidence(path.join(dir, 'h'), 'web', 'desktop:deepseek-harness-desktop');
-  assert.equal(e2.version, '0.2.0-rc.2', 'the scoped host itself is probed');
+  await withWin32(dir, async () => {
+    installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
+    const e = runtimeEvidence(path.join(dir, 'h'), 'web', 'desktop:dshdesktop-dataelement');
+    assert.equal(e.version, null, 'dataelement owns no probes; the machine-level official bundle must be ignored');
+    assert.equal(e.sources.length, 0);
+    const e2 = runtimeEvidence(path.join(dir, 'h'), 'web', 'desktop:deepseek-harness-desktop');
+    assert.equal(e2.version, '0.2.0-rc.2', 'the scoped host itself is probed');
+  });
 });
 
-test('T7 two hosts with the SAME bundled version resolve with full provenance', (t) => {
+test('T7 two hosts with the SAME bundled version resolve with full provenance', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
-  installCommunity(dir, '0.2.0-rc.2');
-  const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
-  assert.equal(e.version, '0.2.0-rc.2');
-  assert.equal(e.ambiguous, null);
-  assert.ok(e.sources.length >= 2, 'provenance keeps every hit');
+  await withWin32(dir, async () => {
+    installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
+    installCommunity(dir, '0.2.0-rc.2');
+    const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
+    assert.equal(e.version, '0.2.0-rc.2');
+    assert.equal(e.ambiguous, null);
+    assert.ok(e.sources.length >= 2, 'provenance keeps every hit');
+  });
 });
 
-test('T7 two hosts with CONFLICTING versions: null + currentAmbiguous, never a silent pick', (t) => {
+test('T7 two hosts with CONFLICTING versions: null + currentAmbiguous, never a silent pick', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
-  installCommunity(dir, '0.1.1-rc.2');
-  const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
-  assert.equal(e.version, null);
-  assert.deepEqual(e.ambiguous.map((a) => a.host).sort(), ['deepseek-harness-desktop', 'dsh-desktop-anywhere-labs']);
-  assert.deepEqual(e.ambiguous.map((a) => a.version).sort(), ['0.1.1-rc.2', '0.2.0-rc.2']);
+  await withWin32(dir, async () => {
+    installOfficial(dir, fs.readFileSync(FIXTURE_ASAR));
+    installCommunity(dir, '0.1.1-rc.2');
+    const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
+    assert.equal(e.version, null);
+    assert.deepEqual(e.ambiguous.map((a) => a.host).sort(), ['deepseek-harness-desktop', 'dsh-desktop-anywhere-labs']);
+    assert.deepEqual(e.ambiguous.map((a) => a.version).sort(), ['0.1.1-rc.2', '0.2.0-rc.2']);
+  });
 });
 
-test('T7 a profile-scoped install outranks desktop bundles (P2-1 parity, tier-1 authority)', (t) => {
+test('T7 a profile-scoped install outranks desktop bundles (P2-1 parity, tier-1 authority)', async (t) => {
   const dir = envSandbox(t);
-  process.env.LOCALAPPDATA = dir;
-  installCommunity(dir, '0.2.0-rc.2');
-  const home = path.join(dir, 'home');
-  const nm = path.join(home, 'profiles', 'web', 'node_modules', '@deepseek-ai', 'dsh');
-  fs.mkdirSync(nm, { recursive: true });
-  fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ version: '9.9.9' }));
-  const e = runtimeEvidence(home, 'web', undefined);
-  assert.equal(e.version, '9.9.9', 'the profile closure is authoritative — machine bundles never compete');
-  assert.deepEqual(e.sources, [{ host: 'profile-node_modules', version: '9.9.9', source: 'profile-node_modules' }]);
+  await withWin32(dir, async () => {
+    installCommunity(dir, '0.2.0-rc.2');
+    const home = path.join(dir, 'home');
+    const nm = path.join(home, 'profiles', 'web', 'node_modules', '@deepseek-ai', 'dsh');
+    fs.mkdirSync(nm, { recursive: true });
+    fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ version: '9.9.9' }));
+    const e = runtimeEvidence(home, 'web', undefined);
+    assert.equal(e.version, '9.9.9', 'the profile closure is authoritative — machine bundles never compete');
+    assert.deepEqual(e.sources, [{ host: 'profile-node_modules', version: '9.9.9', source: 'profile-node_modules' }]);
+  });
 });
 
-test('T7 the npm prefix is a fallback, never a competitor', (t) => {
+test('T7 the npm prefix is a fallback, never a competitor', async (t) => {
   const dir = envSandbox(t);
-  process.env.npm_config_prefix = dir;
-  const nm = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh');
-  fs.mkdirSync(nm, { recursive: true });
-  fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ version: '0.1.1-rc.2' }));
-  assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, '0.1.1-rc.2', 'used when nothing else hits');
-  process.env.LOCALAPPDATA = dir;
-  installCommunity(dir, '0.2.0-rc.2');
-  const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
-  assert.equal(e.version, '0.2.0-rc.2', 'a desktop hit outranks the prefix shim');
-  assert.ok(!e.sources.some((s) => s.host === 'npm-prefix'), 'the shim version must not manufacture ambiguity');
+  await withPlatform('win32', { LOCALAPPDATA: dir, npm_config_prefix: dir }, async () => {
+    const nm = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh');
+    fs.mkdirSync(nm, { recursive: true });
+    fs.writeFileSync(path.join(nm, 'package.json'), JSON.stringify({ version: '0.1.1-rc.2' }));
+    assert.equal(runtimeEvidence(path.join(dir, 'h'), 'web', undefined).version, '0.1.1-rc.2', 'used when nothing else hits');
+    installCommunity(dir, '0.2.0-rc.2');
+    const e = runtimeEvidence(path.join(dir, 'h'), 'web', undefined);
+    assert.equal(e.version, '0.2.0-rc.2', 'a desktop hit outranks the prefix shim');
+    assert.ok(!e.sources.some((s) => s.host === 'npm-prefix'), 'the shim version must not manufacture ambiguity');
+  });
 });
 
 test('T7 the platform gate filters probes: a darwin override must not leak win32 roots (regression)', async (t) => {
