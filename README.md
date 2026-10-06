@@ -50,7 +50,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 
 ```sh
 npm install -g dsh-rehearsal                        # npm registry
-npm install -g github:wuwaka/dsh-rehearsal#v0.3.14   # 或固定到 GitHub tag
+npm install -g github:wuwaka/dsh-rehearsal#v0.3.15   # 或固定到 GitHub tag
 ```
 
 两条路径都不需要 npm 账号。需要把安装内容固定到字节时，用 Release 附带的 tarball 与 `.sha256`（校验步骤见 [PUBLISHING.md](https://github.com/wuwaka/dsh-rehearsal/blob/main/PUBLISHING.md)）。

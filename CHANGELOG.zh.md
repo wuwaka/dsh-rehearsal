@@ -9,6 +9,12 @@
 
 ## [Unreleased]
 
+## [0.3.15] - 2026-10-06
+
+### 变更
+
+- npm 包内文档与仓库对齐：README 安装 pin 更新到 `v0.3.15`（`0.3.14` 包内的 pin 停在 `v0.3.13`，照抄会把 GitHub tag 安装指到旧版本），安全摘要补上 URL userinfo 凭据剥离；`docs/architecture` 双语在写回合抑制第 2 层记录 `--dump-config` fail-closed 前置校验。CHANGELOG 底部链接补齐 `0.3.13`/`0.3.14`/`0.3.15` 三个缺失定义，`[Unreleased]` compare 区间重置。本版不含代码变更——发布它就是为了这件事。
+
 ## [0.3.14] - 2026-10-06
 
 ### 修复
@@ -259,7 +265,9 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.15...HEAD
+[0.3.15]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.14...v0.3.15
+[0.3.14]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.1...v0.3.11
