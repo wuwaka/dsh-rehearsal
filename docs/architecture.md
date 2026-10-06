@@ -77,7 +77,7 @@ peer 失配按方向分级：只有"当前满足、候选不满足"记为阻断�
 三层互相独立，任何单层都不足以支撑"不会执行历史工具"的结论：
 
 1. **沙箱 cwd。** `copySet` 重写副本 header 的 `cwd` 为 `<shadow>/workspace/<n>`，同时把副本迁入对应的编码工作区目录。宿主依据 `header.cwd` 反推会话物理路径，两者必须成对改写。
-2. **抑制工具提供方。** replay patch 同时按行 id 与包名前缀抑制（`dsh-tool-`、`dsh-mcp-`、`dsh-skill`、`dsh-browser`、`dsh-terminal`、`dsh-jobs`、`terminal-`）。`tools` 注册表行保留，agent loop 依赖它。被重放的调用只返回 `isError`。
+2. **抑制工具提供方。** replay patch 同时按行 id 与包名前缀抑制（`dsh-tool-`、`dsh-mcp-`、`dsh-skill`、`dsh-browser`、`dsh-terminal`、`dsh-jobs`、`terminal-`）。`tools` 注册表行保留，agent loop 依赖它。被重放的调用只返回 `isError`。这一层带前置校验：抑制行的 id 全部来自候选 `--dump-config` 的解析，dump 失败、解析不出行或抑制数为零时写路径中止——抑制悄悄失效不得降级成一行日志。
 3. **只读允许清单（fail-closed）。** replay 只会发出该会话历史中出现过的工具，因此预筛是完整信息。仅当历史工具全部属于已知只读内置集合时才演练；`mcp__*` 前缀、执行与写入类、未知第三方工具、无名行一律跳过并记录原因。
 
 工具名提取覆盖四种行形态：`tool/call`、`tool-call-chunks`、`tool/ptc-dispatch`、`tool/code-dispatch[·start]`。只扫第一种会静默漏掉整批工具。

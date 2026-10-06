@@ -26,7 +26,7 @@
   PY
   ```
 
-- 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。`dsh-rehearsal@0.2.1` 起已在 registry（2026-10-03）；npm 前端的实际渲染截至 2026-10-05 仍未复核（npmjs.com 对脚本请求返回 403，需要浏览器人工看一眼）。
+- 相对路径图片在 npm 包页面通常解析不了，海报预期只在 GitHub 生效。`dsh-rehearsal@0.2.1` 首次上 registry（2026-10-03），`0.3.14` 起 latest 与 GitHub tag 一致（2026-10-06）；npm 前端的实际渲染截至 2026-10-06 仍未复核（npmjs.com 对脚本请求返回 403，需要浏览器人工看一眼）。
 - npm 包的文件边界由 `package.json` 的 `files` 决定：用户文档随包（README 双语、SECURITY 双语、CHANGELOG 双语、docs/、src/），维护者文档（AUDIT、PUBLISHING、内部方案文档）不随包；`test/pack.test.js` 双向锁定这条边界。README 里的相互链接在 GitHub 上解析，npm 页面不是文档入口。
 
 ## 文档治理
@@ -49,8 +49,8 @@
 
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
 - **`v0.3.13`（2026-10-05）GitHub Release 已切齐**（评审第七轮修复：安装路径凭据剥离、CLI 旗标统一契约、`clean` 结构判定、README 链接绝对化等，见 CHANGELOG；CI 六组合全绿，附件 tgz + `.sha256`）。`v0.3.12`、`v0.3.11`、`v0.3.1`、`v0.3.0`（同日发布）保留在 GitHub Release，均含各自发布时的缺陷。
-- npm 账号暂停（2026-10-03 一次恢复码过桥登录所致）于 **2026-10-06 08:02 UTC** 自动解除；届时 `gh workflow run publish.yml --ref main` 即可——发布内容就是 main HEAD（即 0.3.13），无需重打 tag；keywords（`dsh`，无 `dsh-plugin`）随该次 publish 生效。`0.2.2`、`0.3.0`、`0.3.1`、`0.3.11` 与 `0.3.12` 都不会上 npm registry，只以 GitHub Release 附件存在。
-- dist-tags 遗留 `tmp-write-verify`（写入探测时创建）：granular token 被 GAT 政策禁止 DELETE（403），需在 npm 网页端手动删除——与上面那次 dispatch 同一会话顺手处理。
+- **`0.3.14` 已于 2026-10-06 上 npm 并占据 `latest`**（评审第八轮修复：信号退出清理、启动清扫遗留影子目录、写回合抑制 fail-closed、URL 内嵌凭据剥离、workflow 加固；SLSA provenance 已随包）。npm 账号暂停（2026-10-03 恢复码过桥登录所致）已于 **2026-10-06 08:02 UTC** 自动解除，本次发布经 `gh workflow run publish.yml --ref main` 完成。npm 版本序列因此从 `0.2.1` 直接跳到 `0.3.14`：`0.2.2`、`0.3.0`、`0.3.1`、`0.3.11`、`0.3.12`、`0.3.13` 只以 GitHub Release 附件存在，不会补发（它们各含已修复的缺陷，补发反而误导安装者）。README 的 npm 版本徽章与安装 pin 自此一致。
+- dist-tags 遗留 `tmp-write-verify`（写入探测时创建，指向 0.2.1）：granular token 被 GAT 政策禁止 DELETE（403），2026-10-06 本机 `npm dist-tag rm` 实测同样 403——需在 npm 网页端手动删除。
 
 ## 新增一条失效签名
 

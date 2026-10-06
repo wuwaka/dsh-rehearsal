@@ -29,7 +29,7 @@ git push origin publish-clean:main        # 先等 CI 绿
 git push origin "vX.Y.Z"                  # 触发 Release job，这是对外可见动作
 ```
 
-`release.yml` 有两种情况直接终止：tag 与 `package.json` 版本不一致；任一份 changelog 缺对应小节。含 `-` 的 tag 自动标记 `--prerelease`，此时 `publish.yml` 仍会尝试 npm 发布，若不希望占据 `latest` dist-tag 需传 `--tag next`。
+`release.yml` 有两种情况直接终止：tag 与 `package.json` 版本不一致；任一份 changelog 缺对应小节。含 `-` 的 tag 自动标记 `--prerelease`。npm 发布不会因 Release 而自动发生：`release.yml` 用 `GITHUB_TOKEN` 创建 Release，GitHub 会抑制该 token 触发的 `release` 事件，所以 `publish.yml` 只能手动 dispatch（见下）——prerelease 经 dispatch 照常发布并占据 `latest` dist-tag，不想让它占 latest，dispatch 前先给 publish 步骤临时加 `--tag next`。
 
 要重建已发布 tag 的正文或附件，用 **Run workflow → `release.yml` → tag**，不要移动公开 tag：该 job 检出 tag 本身，`package.json` 与 changelog 仍取自被 tag 的提交。
 
@@ -47,7 +47,7 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 
 ## 仓库公开之后
 
-- [ ] **npm 发布**：设置 `NPM_TOKEN` 后 `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z`。缺少该 secret 时任务跳过而不是报错。本机默认 registry 是只读镜像：发布走 CI，或显式加 `--registry`（说明见 [docs/MAINTAINING.md](docs/MAINTAINING.md)）。
+- [ ] **npm 发布**：设置 `NPM_TOKEN` 后 `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref main`。需要手动 dispatch 的原因：Release 由 `release.yml` 的 `GITHUB_TOKEN` 创建，GitHub 抑制该 token 的 `release` 事件；`--ref` 用 tag 或 main 均可（tag 发布时二者指向同一提交）。缺少该 secret 时任务跳过而不是报错。本机默认 registry 是只读镜像：发布走 CI，或显式加 `--registry`（说明见 [docs/MAINTAINING.md](docs/MAINTAINING.md)）。
 - [ ] **topics**：`gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`。`dsh-plugin` 只作为检索入口，本仓库刻意不是 `dsh plugin add` 的 bundle。
 - [ ] **目录投稿**：`awesome-dsh-plugin` 拒收外部 CLI。社区目录的调查、投稿状态与徽章时机见 [docs/MAINTAINING.md](docs/MAINTAINING.md)。
 - [ ] `gh run list --repo <you>/dsh-rehearsal` 确认 CI 徽章可解析。

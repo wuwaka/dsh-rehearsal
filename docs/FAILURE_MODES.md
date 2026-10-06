@@ -60,5 +60,5 @@
 
 因此预设会话的写回合执行并上报（`evidence[].preset`、`coverage.writeRounds.presetAttempts` / `presetPass`），但不单独决定阶段结论：`writeRoundVerdict()`（`src/lib/drill.js:101`）仅在非预设轮上取 pass/fail；样本中只有预设可试时整阶段判 `inconclusive`。
 
-完整英文版见 [FAILURE_MODES.en.md](FAILURE_MODES.en.md)。两份的 `## ` 小节数与全部 `file:line` 引用由 `test/docs.test.js` 断言一致。
+与 [FAILURE_MODES.en.md](FAILURE_MODES.en.md) 互为对等版本。两份的 `## ` 小节数与全部 `file:line` 引用由 `test/docs.test.js` 断言一致。
 

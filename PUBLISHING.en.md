@@ -29,7 +29,7 @@ git push origin publish-clean:main        # wait for CI to go green first
 git push origin "vX.Y.Z"                  # triggers the Release job; this is a public action
 ```
 
-`release.yml` stops in two cases: the tag does not match `package.json`, or either changelog lacks the section. A tag containing `-` is marked `--prerelease` automatically, and `publish.yml` will still attempt the npm publish; pass `--tag next` when a prerelease must not take the `latest` dist-tag.
+`release.yml` stops in two cases: the tag does not match `package.json`, or either changelog lacks the section. A tag containing `-` is marked `--prerelease` automatically. npm publishing never happens automatically on a Release: `release.yml` creates the Release with the `GITHUB_TOKEN`, and GitHub suppresses `release` events triggered by that token, so `publish.yml` can only be dispatched by hand (see below) — a prerelease dispatched this way publishes normally and takes the `latest` dist-tag; add `--tag next` to the publish step temporarily before dispatching if it must not.
 
 To rebuild the notes or assets of a tag already published, use **Run workflow → `release.yml` → tag** instead of moving a public tag: the job checks the tag out, so `package.json` and the changelogs still come from the tagged commit.
 
@@ -47,7 +47,7 @@ gh release view "vX.Y.Z" --repo <you>/dsh-rehearsal \
 
 ## After the repository is public
 
-- [ ] **npm publish**: set `NPM_TOKEN`, then `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref vX.Y.Z`. The job skips rather than failing when the secret is absent. The default registry on this machine is a read-only mirror: publish through CI or with an explicit `--registry` (see [docs/MAINTAINING.md](docs/MAINTAINING.md)).
+- [ ] **npm publish**: set `NPM_TOKEN`, then `gh workflow run publish.yml --repo <you>/dsh-rehearsal --ref main`. The manual dispatch is needed because the Release is created by `release.yml` with the `GITHUB_TOKEN`, whose `release` event GitHub suppresses; `--ref` may be the tag or `main` (both point at the same commit for a tag release). The job skips rather than failing when the secret is absent. The default registry on this machine is a read-only mirror: publish through CI or with an explicit `--registry` (see [docs/MAINTAINING.md](docs/MAINTAINING.md)).
 - [ ] **Topics**: `gh api repos/<you>/dsh-rehearsal -X PUT -f "topics[]=deepseek-harness" -f "topics[]=dsh" -f "topics[]=cli" -f "topics[]=upgrade" -f "topics[]=rehearsal"`. `dsh-plugin` is a search affordance only; this repository is deliberately not a `dsh plugin add` bundle.
 - [ ] **Catalogue submissions**: the `awesome-dsh-plugin` catalogue refuses external CLIs. The investigation, submission status and badge timing live in [docs/MAINTAINING.md](docs/MAINTAINING.md).
 - [ ] Confirm the CI badge resolves: `gh run list --repo <you>/dsh-rehearsal`.
