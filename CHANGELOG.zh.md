@@ -9,6 +9,20 @@
 
 ## [Unreleased]
 
+## [0.3.14] - 2026-10-06
+
+### 修复
+
+- `run` 期间收到 SIGINT/SIGTERM/SIGBREAK/SIGHUP 不再遗留影子目录：清理此前只依赖 `finally` 块，而阻塞型 `spawnSync` 期间到达的信号会直接终止进程——明文会话副本留在磁盘上，正是 SECURITY.md『每条退出路径都会删除』的保证没有覆盖到的那一条。现在信号处理器先删除影子 home（与安装前缀）再退出；此外每次 `run` 启动时按 ownership 标记清扫遗留的 `dsh-rehearsal-home-*` 目录（名字相似从不清删，只认本工具的标记）。
+- 写回合对工具抑制改为 fail-closed（`src/lib/shadow.js`）：`writeReplayPatch` 此前不检查 `--dump-config` 是否成功，抑制 0 行只体现为一行日志。dump 命令失败、输出解析不出任何行、或请求抑制却匹配到 0 个执行器行时，写路径直接中止——阶段详情报告 `replay patch fail-closed (<原因>)`，不再带着未经验证的执行器继续；`coverage.writeRounds.toolSuppression` 记录校验结果。
+- 写入补丁的每个 id 都经过 `JSON.stringify`——disable 行此前裸拼 id，与 P2-7 起就对会话派生行加引号的规则不一致。
+- 环境剥除覆盖 URL 内嵌凭据：`http://user:token@host/` 形态的代理与 registry 值此前能穿过名字过滤原样传给子进程。名字过滤保留的值现在会剥掉 userinfo 部分。名字过滤的"误删"方向（`AUTH` 同时匹配 `XAUTHORITY`）有意保留——错误方向是给孩子更少，绝不更多；SECURITY.md 的保证措辞已改为与实现精确一致。
+
+### 变更
+
+- `release.yml` 的 tag 改经环境变量传入 shell，不再用 `${{ }}` 插值；三个 workflow 的 `actions/checkout` 与 `actions/setup-node` 全部按 commit SHA 锁定，`persist-credentials: false` 让用不到 git 凭据的 job 不再持有驻留凭据。
+- `test/fixtures/` 新增 README，说明两个 `.asar` 是手工构造、仅包裹事实性包清单（名称与版本号）的容器，不含官方应用的任何代码、二进制或素材——再分发疑虑就此了结。回归锁：测试数 129 → 140。
+
 ## [0.3.13] - 2026-10-05
 
 ### 修复

@@ -11,6 +11,20 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.14] - 2026-10-06
+
+### Fixed
+
+- SIGINT/SIGTERM/SIGBREAK/SIGHUP during `run` no longer leave the shadow home behind: cleanup used to live only in a `finally` block, which a signal arriving during a blocking `spawnSync` outflies — the process died with the plaintext session copies still on disk, the one exit path SECURITY.md's every-exit-path-deletes guarantee did not cover. The signal handler now removes the shadow home (and the prefix) before exiting; in addition, every `run` sweeps leftover `dsh-rehearsal-home-*` directories at startup, gated on this tool's ownership marker (a name that merely looks ours never authorises a delete).
+- The write round is fail-closed about tool suppression (`src/lib/shadow.js`): `writeReplayPatch` used to parse `--dump-config` output without checking that the command succeeded, and zero suppressed rows was visible only as a log line. A failed dump, a dump that parses to no rows, or a suppression pass matching zero executor rows now aborts the write path — the stage details report `replay patch fail-closed (<reason>)` instead of continuing with unverified executors; `coverage.writeRounds.toolSuppression` records the outcome.
+- Every id written into the replay patch is JSON.stringify'd — disable rows previously interpolated the id bare, inconsistent with the session-derived rows quoted since P2-7.
+- Environment scrubbing covers URL-embedded credentials: a proxy or registry value like `http://user:token@host/` used to pass the name filter untouched and reach the child. Values that survive the name filter now have their userinfo stripped. The name filter's over-removal side (`AUTH` also matches `XAUTHORITY`) is kept deliberately — the error direction is giving a child less, never more — and SECURITY.md's guarantee now states exactly what is and is not covered.
+
+### Changed
+
+- `release.yml` passes the tag into the shell through the environment instead of `${{ }}` interpolation; all three workflows pin `actions/checkout` and `actions/setup-node` by commit SHA, and `persist-credentials: false` keeps git credentials from standing in jobs that never need them.
+- `test/fixtures/` gains a README stating that the two `.asar` archives are hand-built containers around a factual package manifest (names and versions), holding no code, binary or artwork from the official application — settling the redistribution question. Regression locks: tests 129 → 140.
+
 ## [0.3.13] - 2026-10-05
 
 ### Fixed
