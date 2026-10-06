@@ -1,11 +1,17 @@
 name: Publish to npm
 
-# Runs on a published GitHub Release. Publishing from CI (rather than a laptop)
-# is what lets the tarball carry signed provenance, so users can verify where the
-# bits came from.
+# Runs on a published GitHub Release — or on a manual dispatch, which is the
+# only real path: the Release is created by release.yml with the GITHUB_TOKEN,
+# and GitHub suppresses `release` events that token triggers.
 #
-# The job is SKIPPED, not failed, when NPM_TOKEN is absent - a repo without the
-# secret must not show a red release pipeline.
+# Publishing authenticates through OIDC trusted publishing: the npm package
+# trusts `wuwaka/dsh-rehearsal`'s `publish.yml` (configured in the package's
+# npm Settings → Trusted Publisher), and the job's id-token proves identity.
+# No npm secret is involved. The former gate job (skip when NPM_TOKEN absent)
+# and the NODE_AUTH_TOKEN env are gone with the secret dependency.
+#
+# The tarball carries signed provenance either way — with trusted publishing
+# the attestation comes from the same OIDC identity that authorized it.
 
 on:
   release:
@@ -14,34 +20,15 @@ on:
 
 permissions:
   contents: read
-  id-token: write # required for npm provenance attestation
+  id-token: write # required for OIDC trusted publishing and provenance
 
 jobs:
-  gate:
-    runs-on: ubuntu-latest
-    outputs:
-      can-publish: ${{ steps.check.outputs.defined }}
-    steps:
-      - id: check
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        shell: bash
-        run: |
-          if [ -z "$NPM_TOKEN" ]; then
-            echo "defined=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::NPM_TOKEN secret not set - publish skipped"
-          else
-            echo "defined=true" >> "$GITHUB_OUTPUT"
-          fi
-
   publish:
-    needs: gate
-    if: needs.gate.outputs.can-publish == 'true'
     runs-on: ubuntu-latest
     steps:
-      # Pinned by commit SHA, not tag: this workflow holds NPM_TOKEN and
-      # id-token: write, so a retagged action reference must not be able to
-      # swap the executed code underneath it.
+      # Pinned by commit SHA, not tag: this workflow publishes to npm, so a
+      # retagged action reference must not be able to swap the executed code
+      # underneath it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -50,6 +37,10 @@ jobs:
         with:
           node-version: '24.x'
           registry-url: 'https://registry.npmjs.org'
+
+      # OIDC authentication on publish needs npm >= 11.5.1; the npm bundled
+      # with a given Node 24.x patch is not guaranteed to be that new.
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
@@ -68,5 +59,3 @@ jobs:
           echo "packed tarball verified: $tarball"
 
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

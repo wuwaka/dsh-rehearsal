@@ -11,6 +11,12 @@ refuses to publish when either lacks the section for a tag.
 
 ## [Unreleased]
 
+## [0.3.16] - 2026-10-06
+
+### Changed
+
+- The npm publishing channel moves to OIDC trusted publishing: `publish.yml` no longer reads `NPM_TOKEN`. npm has started restricting bypass-2FA granular tokens (the official notice, verbatim: "npm tokens that bypass 2FA are being restricted for account changes and direct publishing"), and that secret is in the restricted class. Publishing is now authorized directly by GitHub Actions' OIDC identity, with `wuwaka/dsh-rehearsal`'s `publish.yml` registered as the trusted publisher on the npm package; the gate job that depended on the secret goes with it, and npm is upgraded before publish to satisfy the OIDC client requirement (>= 11.5.1). The `NPM_TOKEN` secret stays as a fallback — restoring the `NODE_AUTH_TOKEN` env on the publish step reverts to the old channel.
+
 ## [0.3.15] - 2026-10-06
 
 ### Changed
@@ -322,7 +328,8 @@ because the tool's conclusions depend on its safety claims being auditable:
   rehearsal is broad, write-path rehearsal is narrow, and the two must not be
   quoted interchangeably.
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.15...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.16...HEAD
+[0.3.16]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.15...v0.3.16
 [0.3.15]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.14...v0.3.15
 [0.3.14]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...v0.3.13

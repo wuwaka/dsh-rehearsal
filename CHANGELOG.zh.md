@@ -9,6 +9,12 @@
 
 ## [Unreleased]
 
+## [0.3.16] - 2026-10-06
+
+### 变更
+
+- npm 发布通道迁移到 OIDC trusted publishing：`publish.yml` 不再读取 `NPM_TOKEN`。npm 已开始限制 bypass-2FA 的 granular token（发布时的官方提示原文："npm tokens that bypass 2FA are being restricted for account changes and direct publishing"），该 secret 属于被限类别。发布改由 GitHub Actions 的 OIDC 身份直接授权，npm 包侧把 `wuwaka/dsh-rehearsal` 的 `publish.yml` 登记为受信发布方；依赖该 secret 的 gate 前置任务一并移除，publish 前升级 npm 以满足 OIDC 客户端要求（≥ 11.5.1）。`NPM_TOKEN` secret 保留作回退通道——恢复 publish 步骤的 `NODE_AUTH_TOKEN` 环境变量即可退回。
+
 ## [0.3.15] - 2026-10-06
 
 ### 变更
@@ -265,7 +271,8 @@
   5 个通过只读允许清单（占全库 9.6%）。迁移彩排覆盖广、写路径彩排覆盖窄，
   两者不能混着引用。
 
-[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.15...HEAD
+[Unreleased]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.16...HEAD
+[0.3.16]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.15...v0.3.16
 [0.3.15]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.14...v0.3.15
 [0.3.14]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/wuwaka/dsh-rehearsal/compare/v0.3.12...v0.3.13
