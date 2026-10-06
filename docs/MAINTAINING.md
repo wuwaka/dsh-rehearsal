@@ -50,7 +50,7 @@
 - `dsh-rehearsal@0.2.1` 于 2026-10-03 由 CI 首发（`NPM_TOKEN` 已配置，`gh workflow run publish.yml` 手动触发；tag 推送本身不会自动发布）。
 - **`v0.3.13`（2026-10-05）GitHub Release 已切齐**（评审第七轮修复：安装路径凭据剥离、CLI 旗标统一契约、`clean` 结构判定、README 链接绝对化等，见 CHANGELOG；CI 六组合全绿，附件 tgz + `.sha256`）。`v0.3.12`、`v0.3.11`、`v0.3.1`、`v0.3.0`（同日发布）保留在 GitHub Release，均含各自发布时的缺陷。
 - **`0.3.14` 已于 2026-10-06 上 npm 并占据 `latest`**（评审第八轮修复：信号退出清理、启动清扫遗留影子目录、写回合抑制 fail-closed、URL 内嵌凭据剥离、workflow 加固；SLSA provenance 已随包）。npm 账号暂停（2026-10-03 恢复码过桥登录所致）已于 **2026-10-06 08:02 UTC** 自动解除，本次发布经 `gh workflow run publish.yml --ref main` 完成。npm 版本序列因此从 `0.2.1` 直接跳到 `0.3.14`：`0.2.2`、`0.3.0`、`0.3.1`、`0.3.11`、`0.3.12`、`0.3.13` 只以 GitHub Release 附件存在，不会补发（它们各含已修复的缺陷，补发反而误导安装者）。README 的 npm 版本徽章与安装 pin 自此一致。
-- dist-tags 遗留 `tmp-write-verify`（写入探测时创建，指向 0.2.1）：granular token 被 GAT 政策禁止 DELETE（403），2026-10-06 本机 `npm dist-tag rm` 实测同样 403——需在 npm 网页端手动删除。
+- dist-tag `tmp-write-verify`（2026-10-03 写入探测创建）已于 2026-10-06 删除，dist-tags 只剩 `latest`。npm 删除类操作（`dist-tag rm` / deprecate / unpublish）的可用路径：先 `npm login --registry=https://registry.npmjs.org` 建立浏览器会话，再执行 CLI 命令——删除操作会触发 webAuthn 二次认证（CLI 打印一个 `www.npmjs.com/auth/cli/<uuid>` 链接，浏览器确认后放行）。静态 granular token 直接调 API 一律 E403；npm 网页的 Settings / Versions 页没有 dist-tag 管理入口。
 
 ## 新增一条失效签名
 
