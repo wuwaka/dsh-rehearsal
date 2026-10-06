@@ -15,7 +15,7 @@ import { installCandidate, mountReplayPlugin, headlessRun, writeReplayPatch, pat
 import { readIntegrity, writeRound, matchSignatures, extractRoutes, sanitizeStderr, extractHistoryTools, classifyHistory, writeRoundVerdict } from '../lib/drill.js';
 import { decodeAll } from '../lib/zfstd.js';
 import { newReport, addStage, finalize, toMarkdown, writeReport } from '../lib/report.js';
-import { stageTimer, validateVersionOption, claimOwnedDir } from '../lib/util.js';
+import { stageTimer, validateVersionOption, claimOwnedDir, sweepStaleShadowHomes } from '../lib/util.js';
 
 export const BOOT_SIGNATURES = [
   { id: 'patch-entry-not-found', pattern: /patch:\s*entry\s*"[^"]+"\s*not found/i, note: 'upstream #1294 class: a patch row targets a missing entry (also seen as transient jitter — hence two cold boots)' },
@@ -109,6 +109,12 @@ export async function cmdRun(opts) {
   const home = resolved.home;
   const report = newReport({ candidateVersion: opts.to, profile: null, command: 'run' });
   report.target.homeOrigin = resolved.origin;
+  // Sweep leftover shadow homes from runs that died outside every exit path
+  // they control (SIGINT during a blocking spawn, kill -9, a crash) BEFORE
+  // any new plaintext session copies are made. Ownership-marker gated; only
+  // the count enters the report, never a path.
+  const swept = sweepStaleShadowHomes(os.tmpdir(), (l) => console.log('  [run]', l));
+  if (swept.length) report.warnings.push(`swept ${swept.length} stale shadow home(s) left by a previous interrupted run (ownership marker verified)`);
   const artifactsDir = path.resolve(opts.artifacts ?? path.join(process.cwd(), '.dsh-rehearsal', `run-${opts.to}-${Date.now()}`));
   fs.mkdirSync(artifactsDir, { recursive: true });
   // best-effort ownership: a shared pre-existing --artifacts dir stays usable
@@ -253,6 +259,24 @@ export async function cmdRun(opts) {
     if (keepPrefix) return;
     try { fs.rmSync(prefixDir, { recursive: true, force: true }); } catch { /* best effort */ }
   };
+  // Signals: a Ctrl-C that arrives DURING one of the blocking spawns below
+  // terminates the process before the finally net can run, which would leave
+  // the plaintext session copies on disk (the one exit path SECURITY.md's
+  // "every exit path deletes" claim did not cover). The handler is registered
+  // for the lifetime of the shadow home and removed in the finally block.
+  // Windows delivers SIGINT (Ctrl-C) and SIGBREAK (Ctrl-Break); POSIX adds
+  // SIGTERM/SIGHUP. During a blocking spawnSync the callback can only run
+  // after the spawn returns — the same Ctrl-C has already killed the child,
+  // so the wait ends immediately. cleanupShadow() is idempotent, and the
+  // success path's finally call below stays a no-op after a signal cleanup.
+  const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGBREAK', 'SIGHUP'];
+  const onSignal = (sig) => {
+    console.log(`\n  [run] ${sig} received — removing the shadow home (plaintext session copies) before exiting`);
+    cleanupShadow();
+    cleanupPrefix();
+    process.exit({ SIGINT: 130, SIGTERM: 143, SIGHUP: 129, SIGBREAK: 149 }[sig] ?? 129);
+  };
+  for (const s of SIGNALS) process.on(s, onSignal);
   let bin = null;
   try { // OUTER: guarantees shadow/prefix cleanup on every exit path
     // Ownership gate, before anything is written or downloaded: a
@@ -393,6 +417,7 @@ export async function cmdRun(opts) {
     const migrated = sessionResults.filter((r) => r.migrated);
     const mount = mountReplayPlugin(bin, shadowHome, opts.to, (l) => console.log('  [e2-write]', l));
     const writeResults = [];
+    let patchRes = null;
     if (mount.ok && migrated.length) {
       const routes = new Map();
       const fixtureBySession = new Map();
@@ -413,32 +438,51 @@ export async function cmdRun(opts) {
           else for (const m of route.models) if (!routes.get(route.id).models.some((x) => x.id === m.id)) routes.get(route.id).models.push(m);
         }
       }
-      const patchRes = writeReplayPatch(shadowHome, bin, {
-        adapterNamePrefixes: ['@deepseek-ai/dsh-llm-deepseek', '@deepseek-ai/dsh-llm-pi-ai'],
-        providers: [...routes.values()],
-        fixturePath: null,
-        suppressToolRows: !allowTools,
-      });
-      console.log(`  [e2-write] patch: disabled adapters=[${patchRes.disableIds.filter((id) => !patchRes.suppressedToolIds.includes(id)).join(',')}], suppressed tool rows=${patchRes.suppressedToolIds.length}`);
-      const budget = writeRounds;
-      const candidates = cls.selected.filter((x) => fixtureBySession.has(x.sessionId));
-      for (const s of candidates) {
-        const tools = historyTools.get(s.sessionId) ?? [];
-        // fail-closed ALLOWLIST: every replayed tool must be
-        // a known read-only builtin; mcp__*/write-class/unknown/unnamed all
-        // block. Denylist semantics were fail-open for MCP & third-party.
-        const clsHist = classifyHistory(tools);
-        if (!allowTools && !clsHist.ok) {
-          skippedWriteTools.push({ id: s.sessionId, historyTools: tools, writeClass: clsHist.writeClass, unknown: clsHist.unknown });
-          continue;
-        }
-        if (writeResults.length >= budget) break;
-        const res = sessionResults.find((x) => x.id === s.sessionId);
-        const wr = await writeRound({ bin, shadowHome, session: s, fixturePath: fixtureBySession.get(s.sessionId), preIntegrity: res.integrity });
-        writeResults.push(wr);
+      try {
+        patchRes = writeReplayPatch(shadowHome, bin, {
+          adapterNamePrefixes: ['@deepseek-ai/dsh-llm-deepseek', '@deepseek-ai/dsh-llm-pi-ai'],
+          providers: [...routes.values()],
+          fixturePath: null,
+          suppressToolRows: !allowTools,
+        });
+      } catch (e) {
+        // A patch write that throws must not poison the report with a raw
+        // error message (it can carry the shadow path): name the failure
+        // here, print the detail to the console only.
+        console.log(`  [e2-write] replay patch write failed: ${e.message}`);
+        patchRes = { ok: false, reason: 'patch-write-failed', disableIds: [], suppressedToolIds: [], rowInserted: false };
       }
-      if (skippedWriteTools.length) {
-        console.log(`  [e2-write] pre-screen: ${skippedWriteTools.length} session(s) skipped — replayed tools outside the read-only allowlist (rerun with --allow-tools to include)`);
+      if (!patchRes.ok) {
+        // Fail-closed (round 8): tool suppression is the layer that keeps
+        // replayed historical calls off real executors. A dump that failed,
+        // parsed to nothing, or suppressed ZERO rows means that layer is
+        // UNVERIFIED — abort the write path instead of running it while the
+        // log counts "suppressed 0 rows".
+        console.log(`  [e2-write] FAIL-CLOSED: replay patch unverified (${patchRes.reason}) — write round not exercised`);
+      } else {
+        console.log(`  [e2-write] patch: disabled adapters=[${patchRes.disableIds.filter((id) => !patchRes.suppressedToolIds.includes(id)).join(',')}], suppressed tool rows=${patchRes.suppressedToolIds.length}`);
+      }
+      if (patchRes.ok) {
+        const budget = writeRounds;
+        const candidates = cls.selected.filter((x) => fixtureBySession.has(x.sessionId));
+        for (const s of candidates) {
+          const tools = historyTools.get(s.sessionId) ?? [];
+          // fail-closed ALLOWLIST: every replayed tool must be
+          // a known read-only builtin; mcp__*/write-class/unknown/unnamed all
+          // block. Denylist semantics were fail-open for MCP & third-party.
+          const clsHist = classifyHistory(tools);
+          if (!allowTools && !clsHist.ok) {
+            skippedWriteTools.push({ id: s.sessionId, historyTools: tools, writeClass: clsHist.writeClass, unknown: clsHist.unknown });
+            continue;
+          }
+          if (writeResults.length >= budget) break;
+          const res = sessionResults.find((x) => x.id === s.sessionId);
+          const wr = await writeRound({ bin, shadowHome, session: s, fixturePath: fixtureBySession.get(s.sessionId), preIntegrity: res.integrity });
+          writeResults.push(wr);
+        }
+        if (skippedWriteTools.length) {
+          console.log(`  [e2-write] pre-screen: ${skippedWriteTools.length} session(s) skipped — replayed tools outside the read-only allowlist (rerun with --allow-tools to include)`);
+        }
       }
     }
     const fails = writeResults.filter((r) => r.verdict === 'fail');
@@ -452,7 +496,7 @@ export async function cmdRun(opts) {
     const plainRounds = writeResults.filter((r) => !r.preset);
     const presetRounds = writeResults.filter((r) => r.preset);
     const passed = writeResults.filter((r) => r.verdict === 'pass').length;
-    const e2Verdict = writeRoundVerdict({ mountOk: mount.ok, results: writeResults });
+    const e2Verdict = writeRoundVerdict({ mountOk: mount.ok && (patchRes === null || patchRes.ok), results: writeResults });
     addStage(report, {
       id: 'e2-write-round',
       title: `keyless write round (llm-replay adapter; tools ${allowTools ? 'ENABLED (--allow-tools)' : 'SUPPRESSED'}; strict verdict)`,
@@ -461,9 +505,11 @@ export async function cmdRun(opts) {
       durationMs: ms(),
       details: !mount.ok
         ? 'llm-replay mount failed — write path not exercised'
-        : attempted === 0
-          ? `no write round attempted (migrated candidates=${migrated.length}, skipped non-readonly=${skippedWriteTools.length})`
-          : `${attempted} write rounds: ${writeResults.map((r) => `${r.id.slice(0, 13)}=${r.verdict}${r.preset ? '(preset)' : ''}`).join(', ')}; skipped non-readonly=${skippedWriteTools.length}; a 'fail' with v4-producer-source-kind is upstream #1229 class (read-side checks pass)`,
+        : patchRes && !patchRes.ok
+          ? `replay patch fail-closed (${patchRes.reason}) — tool suppression unverified, write path not exercised`
+          : attempted === 0
+            ? `no write round attempted (migrated candidates=${migrated.length}, skipped non-readonly=${skippedWriteTools.length})`
+            : `${attempted} write rounds: ${writeResults.map((r) => `${r.id.slice(0, 13)}=${r.verdict}${r.preset ? '(preset)' : ''}`).join(', ')}; skipped non-readonly=${skippedWriteTools.length}; a 'fail' with v4-producer-source-kind is upstream #1229 class (read-side checks pass)`,
       evidence: writeResults,
     });
     if (mount.ok && attempted > 0 && passed === 0) {
@@ -487,6 +533,7 @@ export async function cmdRun(opts) {
         presetPass: presetRounds.filter((r) => r.verdict === 'pass').length,
         skippedWriteTools: skippedWriteTools.length,
         toolExecution: allowTools ? 'enabled-by-flag' : 'suppressed',
+        toolSuppression: patchRes === null ? 'not-reached' : patchRes.ok ? 'verified' : `unverified:${patchRes.reason}`,
         skippedSessions: skippedWriteTools.map((s) => ({ id: s.id, historyTools: s.historyTools, writeClass: s.writeClass, unknown: s.unknown })),
       },
     };
@@ -506,6 +553,7 @@ export async function cmdRun(opts) {
     // Runs on success (idempotent no-op) AND on any throw/early return.
     if (shadowCleanup === null) cleanupShadow();
     cleanupPrefix();
+    for (const s of SIGNALS) process.removeListener(s, onSignal);
   }
 }
 

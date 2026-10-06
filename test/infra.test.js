@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { countRows, simpleListAfter } from '../src/lib/yaml-lite.js';
 import { listProfiles, detectCurrentDshVersion, runtimeEvidence } from '../src/lib/dshhome.js';
-import { shadowEnv, redactedEnvNames, claimOwnedDir, readOwner, isOwnedArtifactsDir, sanitizedEnv, run } from '../src/lib/util.js';
+import { shadowEnv, redactedEnvNames, claimOwnedDir, readOwner, isOwnedArtifactsDir, sanitizedEnv, stripUrlCredentials, run } from '../src/lib/util.js';
 import { patchAdoptionGate } from '../src/lib/shadow.js';
 
 const DESKTOP_LIKE = `- id: desktop-shell
@@ -71,6 +71,37 @@ test('P2-6: shadowEnv is a complete env with secrets stripped, parent untouched'
     delete process.env.SECRET_PROBE_TOKEN;
     delete process.env.PLAIN_VAR;
   }
+});
+
+test('sanitizedEnv strips URL-embedded userinfo credentials from surviving values (round 8)', (t) => {
+  // a credential can hide in a VALUE whose NAME matches nothing: proxy and
+  // registry endpoints are the common carriers (http://user:token@host/...)
+  process.env.R8_HTTP_PROXY = 'http://user:secret@proxy.example.com:8080';
+  process.env.R8_NPM_CONFIG_REGISTRY = 'https://user:token@registry.example.org/';
+  process.env.R8_PLAIN_URL = 'https://registry.npmjs.org/';
+  try {
+    const env = sanitizedEnv();
+    assert.equal(env.R8_HTTP_PROXY, 'http://proxy.example.com:8080/', 'proxy userinfo stripped');
+    assert.equal(env.R8_NPM_CONFIG_REGISTRY, 'https://registry.example.org/', 'registry userinfo stripped');
+    assert.equal(env.R8_PLAIN_URL, 'https://registry.npmjs.org/', 'URL without userinfo unchanged');
+    assert.equal(process.env.R8_HTTP_PROXY, 'http://user:secret@proxy.example.com:8080', 'parent env NEVER mutated');
+    // a child must not see the secret either
+    const r = run(process.execPath, ['-e', 'console.log((process.env.R8_HTTP_PROXY.match(/secret|user/) ?? ["clean"]).join(""))'], { env: sanitizedEnv() });
+    assert.equal(r.stdout.trim(), 'clean', 'userinfo credentials do not reach the child');
+  } finally {
+    delete process.env.R8_HTTP_PROXY;
+    delete process.env.R8_NPM_CONFIG_REGISTRY;
+    delete process.env.R8_PLAIN_URL;
+  }
+});
+
+test('stripUrlCredentials: unit contract — non-URLs, unparseable values and query strings pass through', () => {
+  assert.equal(stripUrlCredentials('https://u:p@host/path'), 'https://host/path');
+  assert.equal(stripUrlCredentials('http://user:P@ss@host:8080'), 'http://host:8080/', 'only the LAST @ separates userinfo');
+  assert.equal(stripUrlCredentials('C:\\Users\\somebody\\file'), 'C:\\Users\\somebody\\file', 'a path is not a URL');
+  assert.equal(stripUrlCredentials('not a url'), 'not a url');
+  assert.equal(stripUrlCredentials('http://[::1:bad'), 'http://[::1:bad', 'unparseable URL passes through unchanged');
+  assert.equal(stripUrlCredentials(42), 42, 'non-string values are returned as-is');
 });
 
 test('detectCurrentDshVersion prefers the profile-scoped install over machine probes (P2-1)', (t) => {

@@ -126,6 +126,13 @@ export function mountReplayPlugin(bin, shadowHome, version, log = () => {}) {
  * as a replace of an existing entry and is skipped with
  * `patch: entry "..." not found` when absent.
  *
+ * FAIL-CLOSED (round 8): the composition dump is the ONLY source of executor
+ * row ids, so when the dump command fails, its output parses to no rows, or
+ * tool suppression is requested but ends up suppressing ZERO rows, the write
+ * path must abort instead of continuing with live tool executors while the
+ * log merely counts "suppressed 0 rows". Callers gate the write round on
+ * `ok` (run.js records the reason in the stage details).
+ *
  * SAFETY: with `suppressToolRows` (default TRUE —
  * a library-level fail-open default would be), every executor row is
  * disabled before the write round, matched by id OR by package NAME prefix:
@@ -135,8 +142,9 @@ export function mountReplayPlugin(bin, shadowHome, version, log = () => {}) {
  * ids do not start with `tool-`; the name prefixes close that (verified
  * against the real 96-row headless composition). The `tools` REGISTRY row is
  * never disabled — agent-loop depends on ctx.tools; `dsh-tools` is NOT
- * matched by the `dsh-tool-` prefix (hyphen boundary). Session-derived ids
- * and names are JSON.stringify'd (P2-7) so hostile values cannot break YAML.
+ * matched by the `dsh-tool-` prefix (hyphen boundary). Every id written into
+ * the patch (disable rows, session-derived providers, names) is
+ * JSON.stringify'd (P2-7) so hostile values cannot break YAML.
  */
 const TOOL_ROW_NAME_PREFIXES = [
   '@deepseek-ai/dsh-tool-',
@@ -148,27 +156,28 @@ const TOOL_ROW_NAME_PREFIXES = [
 ];
 
 export function writeReplayPatch(shadowHome, bin, { adapterNamePrefixes, providers, fixturePath, suppressToolRows = true }) {
+  const fail = (reason) => ({ ok: false, reason, disableIds: [], suppressedToolIds: [], rowInserted: false });
   const dc = run(process.execPath, [bin, '--profile', 'headless', '--dump-config'], { cwd: shadowHome, env: shadowEnv(shadowHome), timeoutMs: 120000 });
+  if (dc.code !== 0 || !dc.stdout.trim()) return fail('dump-config-failed');
   // Row-pair pass: dump lines are `- id: X` followed by an indented
   // `name: '...'`; name must be evaluated AFTER its id line, hence the
   // two-phase collect-then-decide (the old single-pass missed name-only
   // matches when the decision fired on the id line).
   const rows = [];
-  if (dc.stdout) {
-    let cur = null;
-    for (const line of dc.stdout.split('\n')) {
-      const idm = line.match(/^-\s+id:\s*(\S+)/);
-      if (idm) {
-        cur = { id: idm[1].replace(/^['"]|['"]$/g, ''), name: null };
-        rows.push(cur);
-        continue;
-      }
-      if (cur) {
-        const nm = line.match(/^\s+name:\s*(\S+)/);
-        if (nm) cur.name = nm[1].replace(/^['"]|['"]$/g, '');
-      }
+  let cur = null;
+  for (const line of dc.stdout.split('\n')) {
+    const idm = line.match(/^-\s+id:\s*(\S+)/);
+    if (idm) {
+      cur = { id: idm[1].replace(/^['"]|['"]$/g, ''), name: null };
+      rows.push(cur);
+      continue;
+    }
+    if (cur) {
+      const nm = line.match(/^\s+name:\s*(\S+)/);
+      if (nm) cur.name = nm[1].replace(/^['"]|['"]$/g, '');
     }
   }
+  if (!rows.length) return fail('dump-config-unparsed');
   const disableIds = [];
   const suppressedToolIds = [];
   for (const r of rows) {
@@ -187,6 +196,10 @@ export function writeReplayPatch(shadowHome, bin, { adapterNamePrefixes, provide
       suppressedToolIds.push(r.id);
     }
   }
+  // Suppression is a safety layer: requested-but-empty means the dump format
+  // drifted out from under the parser (or the composition changed shape) —
+  // never continue into a write round whose executors may be live.
+  if (suppressToolRows && suppressedToolIds.length === 0) return fail('tool-suppression-empty');
   const routes = providers
     .map((p) => {
       const models = p.models
@@ -204,7 +217,7 @@ export function writeReplayPatch(shadowHome, bin, { adapterNamePrefixes, provide
   // fixtures cannot be expressed in one static patch file).
   const fileBlock = fixturePath ? [`      file: ${JSON.stringify(fixturePath).replace(/\\\\/g, '/')}`] : [];
   const patch = [
-    ...disableIds.map((id) => `- id: ${id}\n  disabled: true`),
+    ...disableIds.map((id) => `- id: ${JSON.stringify(id)}\n  disabled: true`),
     '- insert:',
     '  - id: llm-replay',
     "    name: '@deepseek-ai/dsh-llm-replay'",
@@ -213,7 +226,7 @@ export function writeReplayPatch(shadowHome, bin, { adapterNamePrefixes, provide
     ...providersBlock,
   ].join('\n');
   fs.writeFileSync(path.join(shadowHome, 'profiles', 'headless', 'cordis.patch.yml'), patch + '\n');
-  return { disableIds, suppressedToolIds, rowInserted: true };
+  return { ok: true, disableIds, suppressedToolIds, rowInserted: true };
 }
 
 /**

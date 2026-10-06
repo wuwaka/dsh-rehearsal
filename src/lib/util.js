@@ -25,9 +25,9 @@ export const ASSUMED_CONTEXT_WINDOW_TOKENS = 256000;
  * never a verdict. Callers decide verdicts from artifacts.
  */
 export function run(cmd, args, { cwd, env, timeoutMs = 180000, shell = false, retries = 3 } = {}) {
-  // This machine's node.exe lives under a directory that intermittently
-  // returns transient ENOENT on CreateProcess (AV scan / update window).
-  // Retry the spawn itself; only real failures bubble up.
+  // Some hosts intermittently return transient ENOENT on CreateProcess
+  // (AV scan or an update window holding the executable). Retry the spawn
+  // itself; only real failures bubble up.
   let last = null;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const r = spawnSync(cmd, args, {
@@ -69,7 +69,10 @@ export function run(cmd, args, { cwd, env, timeoutMs = 180000, shell = false, re
  * process is never mutated, and every credential-shaped variable (API_KEY /
  * TOKEN / SECRET / CREDENTIAL / PASSWORD / PRIVATE_KEY / AUTH) is stripped
  * rather than only DEEPSEEK_API_KEY. Reports record the REDACTED NAMES via
- * redactedEnvNames(), never values.
+ * redactedEnvNames(), never values. Values that survive the name filter are
+ * additionally scrubbed of URL-embedded userinfo credentials by
+ * stripUrlCredentials() — proxies and registry endpoints commonly carry
+ * inline credentials their NAME does not reveal.
  *
  * shadowEnv() additionally points DSH_HOME at a shadow home and disables
  * telemetry explicitly (candidate 0.2.0 defaults FEEDBACK_ONLY and OTLP
@@ -77,8 +80,32 @@ export function run(cmd, args, { cwd, env, timeoutMs = 180000, shell = false, re
  */
 const SECRET_KEY = /API[_-]?KEY|TOKEN|SECRET|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|AUTH/i;
 
+// The name filter errs on the side of REMOVING. Benign names can collide
+// with the pattern (XAUTHORITY matches /AUTH/ and is dropped); a shadow
+// child never needs X11 state, and over-removal keeps the guarantee
+// one-sided. What the filter deliberately does NOT do is let a credential
+// through because it hides inside a value — that half is stripUrlCredentials.
 export function redactedEnvNames(env = process.env) {
   return Object.keys(env).filter((k) => SECRET_KEY.test(k)).sort();
+}
+
+/**
+ * Strip embedded userinfo credentials from URL-shaped values:
+ * https://user:token@registry.example.org/ → https://registry.example.org/.
+ * Applied to every variable that survives the name filter — HTTP(S) proxy
+ * and npm registry values are the common carriers. Unparseable or non-URL
+ * values pass through unchanged. Query-string secrets are NOT covered and
+ * no document claims otherwise: the guarantee is credential-shaped NAMES
+ * plus URL userinfo, and it fails in the direction of removing.
+ */
+export function stripUrlCredentials(value) {
+  if (typeof value !== 'string' || !/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
+  let u;
+  try { u = new URL(value); } catch { return value; }
+  if (!u.username && !u.password) return value;
+  u.username = '';
+  u.password = '';
+  return u.toString();
 }
 
 /**
@@ -92,7 +119,7 @@ export function sanitizedEnv() {
   const env = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (SECRET_KEY.test(k)) continue;
-    env[k] = v;
+    env[k] = stripUrlCredentials(v);
   }
   return env;
 }
@@ -215,4 +242,32 @@ export function isOwnedArtifactsDir(dir) {
 export function isDangerousTarget(dir) {
   const resolved = path.resolve(dir);
   return [path.parse(resolved).root, os.homedir(), process.cwd()].includes(resolved);
+}
+
+/**
+ * Remove stale shadow homes left by a previous run that died outside every
+ * exit path it controls — SIGINT during a blocking spawnSync, kill -9, a
+ * crash. Those directories hold plaintext session copies, so `run` sweeps
+ * them BEFORE it creates any new ones. Only directories carrying THIS
+ * tool's shadow ownership marker are removed; a name that merely looks
+ * ours never authorises a delete (the same rule `clean` follows), and
+ * sweep failures are left in place rather than retried destructively.
+ * scanRoot is injectable for tests; production scans os.tmpdir(). Returns
+ * the removed directory NAMES (never paths — reports are scrubbed data).
+ */
+export function sweepStaleShadowHomes(scanRoot = os.tmpdir(), log = () => {}) {
+  const removed = [];
+  let entries;
+  try { entries = fs.readdirSync(scanRoot, { withFileTypes: true }); } catch { return removed; }
+  for (const e of entries) {
+    if (!e.isDirectory() || !e.name.startsWith('dsh-rehearsal-home-')) continue;
+    const dir = path.join(scanRoot, e.name);
+    if (readOwner(dir) !== OWNER_KINDS.shadow) continue;
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      removed.push(e.name);
+    } catch { /* in use or already gone: leave it, it is only swept again next run */ }
+  }
+  if (removed.length) log(`removed ${removed.length} stale shadow home(s) left by a previous interrupted run`);
+  return removed;
 }

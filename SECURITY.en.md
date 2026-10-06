@@ -14,13 +14,13 @@ The properties below are enforced in code and covered by tests. A report that an
 | Deletion and writes carry an ownership boundary: `clean` only removes artifact directories bearing this tool's marker (the home, the working directory and filesystem roots are refused outright); `--shadow-dir` / `--prefix-dir` are refused when non-empty and unmarked | `src/lib/util.js`, `src/cli.js` |
 | The rehearsal never installs into a live profile; the candidate goes into a private npm prefix with `DSH_HOME` pointed elsewhere | `src/lib/shadow.js` `installCandidate` |
 | Session copies have their recorded `cwd` rewritten into the shadow home and are relocated to the matching encoded workspace directory | `src/lib/sessions.js` `copySet` |
-| No credential-shaped environment variable reaches any child process (the candidate's own runs and the candidate install's npm lifecycle scripts alike); only the stripped variable names are recorded | `src/lib/util.js:69-103` |
-| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:103` |
+| Credential-shaped environment variables are stripped by NAME (the candidate's own runs and the candidate install's npm lifecycle scripts alike); values that survive the name filter additionally have URL-embedded userinfo credentials stripped (proxies and registry endpoints are the common carriers). The name filter can also remove harmless variables (e.g. `XAUTHORITY`, matched by `AUTH`) — the error direction is giving less, never more. Only the stripped variable names are recorded | `src/lib/util.js:69-130` |
+| Telemetry is force-disabled (`DSH_TELEMETRY_MODE=DISABLED`) | `src/lib/util.js:130` |
 | Reports contain no message bodies and no user paths: `stderr` keeps only diagnostic lines, evidence objects are redacted per string, and `finalize()` scrubs every stage, the coverage block, the target and the warnings; a scrub that fails the invariant makes `writeReport()` refuse to write | `src/lib/report.js:225`; a separate test greps the finished report for home paths and reasoning markers |
 | Tool providers are suppressed by row id and by package-name prefix by default; a session is drilled only when every tool in its own history is on the read-only allowlist (fail-closed) | `src/lib/shadow.js`, `src/lib/drill.js` |
-| The shadow home holds plaintext session copies and is deleted on every exit path, with the outcome recorded as `shadowCleanup` | `src/commands/run.js` |
+| The shadow home holds plaintext session copies: every normal exit path deletes it and records the outcome as `shadowCleanup`; SIGINT/SIGTERM/SIGBREAK/SIGHUP trigger a best-effort delete (a signal arriving during a blocking spawn is acted on once that spawn returns); shadow homes left behind by a kill or a crash are swept by the NEXT `run` at startup, gated on this tool's ownership marker | `src/commands/run.js`, `src/lib/util.js:258` |
 
-The failure direction of the tool-suppression list (`src/lib/shadow.js:141`) is one-sided: if a new tool family escapes the list, its row stays enabled, but this opens no execution path — the write round only replays tool calls that appear in the session's own recording, and sessions whose history carries unknown or write-class tools are skipped wholesale at the pre-screen (fail-closed). A stale list leaves suppression incomplete; it never lets an unexpected tool execute. `--allow-tools` (off by default) remains the outermost explicit gate.
+The failure direction of the tool-suppression list (`src/lib/shadow.js:149`) is one-sided: if a new tool family escapes the list, its row stays enabled, but this opens no execution path — the write round only replays tool calls that appear in the session's own recording, and sessions whose history carries unknown or write-class tools are skipped wholesale at the pre-screen (fail-closed). A stale list leaves suppression incomplete; it never lets an unexpected tool execute. `--allow-tools` (off by default) remains the outermost explicit gate. The list also sits behind a further gate: before the write round starts, the candidate's `--dump-config` is run and all executor rows are parsed — a failed dump, a dump that parses to no rows, or a suppression request that ends up suppressing ZERO rows aborts the write path instead of continuing with unverified executors.
 
 ## Explicitly dangerous options
 
@@ -58,7 +58,7 @@ Three independent checks:
 ```sh
 # 1) every migration artifact in the real library must predate the rehearsal
 find ~/.dsh/sessions -name 'session.v4.jsonl.zstd' -printf '%TY-%Tm-%Td %TH:%TM %p\n' | sort | tail -3
-# 2) no shadow directory is left behind (unless --keep or --shadow-dir was used)
+# 2) no shadow directory is left behind (unless --keep or --shadow-dir was used; marked leftovers of an interrupted run are swept automatically at the next run's startup)
 ls -d "${TMPDIR:-/tmp}"/dsh-rehearsal-home-* 2>/dev/null | wc -l
 # 3) the report contains neither a home path nor message bodies; replace <TOKENS> with the reader's own username and drive keywords
 node -e "const fs=require('fs');const d=fs.readdirSync('.dsh-rehearsal').sort().pop();\
