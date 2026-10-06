@@ -21,7 +21,11 @@ test('npm pack ships user docs and stays free of maintainer-only documents (revi
     windowsHide: true,
   });
   assert.equal(r.status, 0, `npm pack --dry-run failed: ${r.stderr}`);
-  const files = new Set(JSON.parse(r.stdout)[0].files.map((f) => f.path.replace(/\\/g, '/')));
+  // npm 11 wraps the pack info in an array; npm 12 keys it by package name.
+  const parsed = JSON.parse(r.stdout);
+  const entry = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+  assert.ok(entry && Array.isArray(entry.files), `unexpected npm pack --json shape: ${r.stdout.slice(0, 200)}`);
+  const files = new Set(entry.files.map((f) => f.path.replace(/\\/g, '/')));
 
   for (const must of [
     'package.json',
