@@ -7,8 +7,9 @@
 ## 目录投稿
 
 - `awesome-dsh-plugin` 拒收外部 CLI：其 `scripts/check-submission.mjs:258-264` 要求某个 `package.json` 声明 `dsh.bundle`，只声明 `dsh.client` 亦被拒。同为外部 CLI 的 `dsh-plugin-reducer`、`dsh-canary` 在该目录 4,412 条中 0 命中。
-- 投稿状态（2026-10-04）：`Dominic789654/awesome-deepseek-harness#579`（359★，条目在 Session & Memory Management）**已合并**；`0xsline/awesome-deepseek-harness#679`（1,133★，Runtime & Operations）与 `Zhiyuan-Fan/Awesome-DeepSeek-Harness-Plugins#85`（569★，Sessions & Storage 表格）在审。三个 PR 均为双语条目同一 PR，收到审核意见需按各清单 contributing 规则跟进。收录目录的可选 `tarball` 键要求 https、GitHub Release 托管、`.tgz` 结尾——Release 附件（tarball + `.sha256`）已是这个形状。
-- 徽章：已加（2026-10-04）——npm 版本徽章，与 `listed in awesome-deepseek-harness`（锚到 Session & Memory Management 小节；`Dominic789654/awesome-deepseek-harness#579` 已合并）。其余两处在审目录（`0xsline#679`、`Zhiyuan-Fan#85`）合并后再决定是否换指向。`dsh-doctor` 的门禁徽章不适用（其 R/K/D 门评分 `dsh.bundle` 包）。
+- 投稿状态（2026-10-10 复核）：`Dominic789654/awesome-deepseek-harness#579`（372★）**已合并**（2026-10-03），条目在 `Session & Memory Management`；`0xsline/awesome-deepseek-harness#679`（1,157★）**已合并**（2026-10-10 02:57 UTC，维护者本人放行，merge commit `1b927e3`），条目在 `Runtime & Operations`——该仓库 `README.md` 第 879 行（英）与 `README.zh-CN.md` 第 875 行（中）；`Zhiyuan-Fan/Awesome-DeepSeek-Harness-Plugins#85`（572★，`Sessions & Storage` 表格）仍在审且看不到处理迹象：该仓库当日挂着 12 个 open PR，最后一次合并是 `#77`（2026-09-15），main 自 2026-09-15 07:30 起无提交。三个 PR 均为双语条目同一 PR，收到审核意见需按各清单 contributing 规则跟进。收录目录的可选 `tarball` 键要求 https、GitHub Release 托管、`.tgz` 结尾——Release 附件（tarball + `.sha256`）已是这个形状。
+- 复核"条目还在不在目录里"有个取数陷阱：GitHub `GET /repos/{o}/{r}/contents/{path}` 对超过 1 MB 的文件仍返回 200 和元数据，但把 `content` 置为 `null`，base64 解码得到空串，`grep -c` 于是报 0 命中，读起来跟"条目被自动扫描冲掉了"一模一样。Dominic 那份 README 是 1,461,349 字节，正好越界；必须用 `gh api -H "Accept: application/vnd.github.raw+json"` 取原文。`search/code?q=repo:...` 对这种大文件同样返回 0 命中，也不能用来证明不存在。先确认拿到的字节数不为 0，再下结论。
+- 徽章：已加（2026-10-04）——npm 版本徽章，与 `listed in awesome-deepseek-harness`。2026-10-10 起 `listed in` 为两条并列（README 双语两份同步）：新增一条锚到 `0xsline/awesome-deepseek-harness#runtime--operations`，原 Dominic 那条保留，锚 `#session--memory-management`。npm 页面的 README 是发布时冻结进 tarball 的，所以 npmjs.com 上仍是单条旧样式，下一次发版自动带上；为一条徽章单独占一个版本号不划算。`Zhiyuan-Fan#85` 未合并，不给它加徽章。`dsh-doctor` 的门禁徽章不适用（其 R/K/D 门评分 `dsh.bundle` 包）。
 
 ## 仓库图片与社交预览
 

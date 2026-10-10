@@ -14,7 +14,8 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 [![CI](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml/badge.svg?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/actions/workflows/ci.yml)
 [![stars](https://img.shields.io/github/stars/wuwaka/dsh-rehearsal?style=flat-square)](https://github.com/wuwaka/dsh-rehearsal/stargazers)
 [![topic](https://img.shields.io/badge/topic-dsh-4d6bfe?style=flat-square)](https://github.com/topics/dsh)
-[![listed](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness-4d6bfe?style=flat-square)](https://github.com/Dominic789654/awesome-deepseek-harness#session--memory-management)
+[![listed in 0xsline](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness%20%280xsline%29-4d6bfe?style=flat-square)](https://github.com/0xsline/awesome-deepseek-harness#runtime--operations)
+[![listed in Dominic789654](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness-4d6bfe?style=flat-square)](https://github.com/Dominic789654/awesome-deepseek-harness#session--memory-management)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
 </div>
