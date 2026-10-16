@@ -16,6 +16,7 @@ DeepSeek Harness（`dsh`）升级预演工具。升级前用现有会话的副�
 [![topic](https://img.shields.io/badge/topic-dsh-4d6bfe?style=flat-square)](https://github.com/topics/dsh)
 [![listed in 0xsline](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness%20%280xsline%29-4d6bfe?style=flat-square)](https://github.com/0xsline/awesome-deepseek-harness#runtime--operations)
 [![listed in Dominic789654](https://img.shields.io/badge/listed%20in-awesome--deepseek--harness-4d6bfe?style=flat-square)](https://github.com/Dominic789654/awesome-deepseek-harness#session--memory-management)
+[![listed in Zhiyuan-Fan](https://img.shields.io/badge/listed%20in-Awesome--DeepSeek--Harness--Plugins%20%28Zhiyuan--Fan%29-4d6bfe?style=flat-square)](https://github.com/Zhiyuan-Fan/Awesome-DeepSeek-Harness-Plugins#sessions--storage)
 [![tested](https://img.shields.io/badge/tested%20on-DSH%200.2.0--rc.2-4d6bfe?style=flat-square)](#兼容性)
 
 </div>
